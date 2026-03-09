@@ -47,12 +47,19 @@ export function ChatProvider({ children }) {
       const data = await response.json();
       
       if (data.success && data.conversations && data.conversations.length > 0) {
-        setChats(data.conversations);
-        setActiveChatId(data.conversations[0].id);
-        
         // Update counter to be higher than any existing ID
         const maxId = Math.max(...data.conversations.map(c => parseInt(c.id) || 0));
-        setChatCounter(maxId + 1);
+        const nextId = maxId + 1;
+        setChatCounter(nextId + 1);
+        
+        // Create a new empty chat for the current session
+        const newChat = createChat(nextId);
+        
+        // Set chats: new empty chat first, then all loaded conversations
+        setChats([newChat, ...data.conversations]);
+        
+        // Set the new empty chat as active (main chat area will be empty)
+        setActiveChatId(newChat.id);
       } else {
         // No conversations, start with default
         const defaultChat = createChat(1);
