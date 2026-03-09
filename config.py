@@ -5,6 +5,10 @@ Shared across all modules - no merge conflicts expected
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent
@@ -13,9 +17,9 @@ TOOLS_DIR = PROJECT_ROOT / "tools"
 AGENT_DIR = PROJECT_ROOT / "agent"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 
-# OpenAI Configuration
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "your-api-key-here")
-OPENAI_MODEL = "gpt-4-turbo-preview"  # or "gpt-3.5-turbo" for faster/cheaper
+# Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your-gemini-api-key-here")
+GEMINI_MODEL = "gemini-2.0-flash"  # or "gemini-1.5-pro" for higher quality
 
 # Data source paths
 EMAIL_DATA_PATH = SAMPLE_DATA_DIR / "emails.json"
