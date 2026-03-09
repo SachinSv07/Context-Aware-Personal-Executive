@@ -2,10 +2,9 @@
 # Python Dependencies
 
 # Core dependencies
-python>=3.8
 
-# OpenAI for LLM agent
-openai>=1.0.0
+# Google Gemini for LLM agent
+google-genai>=1.0.0
 
 # Web frameworks (choose one or both)
 streamlit>=1.28.0

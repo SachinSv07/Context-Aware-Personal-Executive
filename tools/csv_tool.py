@@ -79,6 +79,44 @@ def search_csv(query: str) -> List[Dict[str, Any]]:
         return []
 
 
+class CsvTool:
+    """
+    Class-based CSV search tool.
+    Searches all columns in notes.csv for a given query string.
+    """
+
+    def run(self, query: str):
+        """
+        Search through CSV rows for a query match in any field.
+
+        Args:
+            query: The keyword or phrase to search for.
+
+        Returns:
+            List of matching row dicts, or a 'not found' message.
+        """
+        results = []
+
+        try:
+            with open("sample_data/notes.csv", "r", encoding="utf-8") as file:
+                reader = csv.DictReader(file)
+                print("Searching for:", query)
+                for row in reader:
+                    print("Checking:", row)
+                    if any(query.lower() in str(value).lower() for value in row.values()):
+                        results.append(dict(row))
+
+        except FileNotFoundError:
+            return "CSV data file not found"
+        except Exception as e:
+            return f"Error reading CSV: {e}"
+
+        if not results:
+            return "No relevant CSV row found"
+
+        return results
+
+
 # Alternative implementation using pandas (optional)
 def search_csv_pandas(query: str) -> List[Dict[str, Any]]:
     """

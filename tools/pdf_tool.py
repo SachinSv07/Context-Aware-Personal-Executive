@@ -89,6 +89,46 @@ def search_pdf(query: str) -> List[Dict[str, Any]]:
         return []
 
 
+class PdfTool:
+    """
+    Class-based PDF/text search tool.
+    Reads the PDF placeholder text file and searches line by line.
+    """
+
+    def run(self, query: str):
+        """
+        Search through the PDF text content for a query match.
+
+        Args:
+            query: The keyword or phrase to search for.
+
+        Returns:
+            List of matching lines, or a 'not found' message.
+        """
+        results = []
+
+        try:
+            with open("sample_data/README_PDF.txt", "r", encoding="utf-8") as file:
+                lines = file.readlines()
+
+            print("Searching for:", query)
+            for line in lines:
+                stripped = line.strip()
+                print("Checking:", stripped)
+                if stripped and query.lower() in stripped.lower():
+                    results.append(stripped)
+
+        except FileNotFoundError:
+            return "PDF data file not found"
+        except Exception as e:
+            return f"Error reading PDF: {e}"
+
+        if not results:
+            return "No relevant content found"
+
+        return results
+
+
 # Tool specification for OpenAI function calling
 PDF_TOOL_SPEC = {
     "type": "function",
