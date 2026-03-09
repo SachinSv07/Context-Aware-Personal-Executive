@@ -2,6 +2,125 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuthHeaders } from '../utils/auth';
 
+// OAuth Setup Modal
+function OAuthSetupModal({ isOpen, onClose, onSave }) {
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!clientId.trim() || !clientSecret.trim()) {
+      setError('Both Client ID and Client Secret are required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    const success = await onSave({ clientId, clientSecret });
+    
+    if (success) {
+      setClientId('');
+      setClientSecret('');
+      onClose();
+    } else {
+      setError('Failed to save OAuth credentials');
+    }
+    
+    setLoading(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Google OAuth Setup</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Enter your Google Cloud OAuth credentials to enable Gmail integration
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
+          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 text-xs text-blue-300">
+            <p className="mb-2 font-semibold">📋 Setup Instructions:</p>
+            <ol className="ml-4 space-y-1 list-decimal">
+              <li>Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-200">Google Cloud Console</a></li>
+              <li>Create project → Enable Gmail API</li>
+              <li>Create OAuth credentials (Web application)</li>
+              <li>Add redirect URI: <code className="rounded bg-slate-800 px-1 py-0.5">http://localhost:5000/api/auth/google/callback</code></li>
+              <li>Copy Client ID and Client Secret below</li>
+            </ol>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-300">
+              Client ID
+            </label>
+            <input
+              type="text"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="your-client-id.apps.googleusercontent.com"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-300">
+              Client Secret
+            </label>
+            <input
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              placeholder="GOCSPX-••••••••••••••••••••"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 rounded-xl bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save & Connect'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Card for text input sources (Email, Notes)
 function TextInputCard({ title, description, value, onChange, buttonText = 'Save', onAction, helpText }) {
   return (
@@ -193,6 +312,8 @@ function Dashboard() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [showOAuthModal, setShowOAuthModal] = useState(false);
+  const [oauthConfigured, setOauthConfigured] = useState(false);
   const navigate = useNavigate();
 
   // Check OAuth status on mount
@@ -222,6 +343,7 @@ function Dashboard() {
       });
       const data = await response.json();
       setGmailConnected(data.connected || false);
+      setOauthConfigured(data.oauth_configured || false);
     } catch (error) {
       console.error('Error checking Gmail status:', error);
     }
@@ -231,8 +353,11 @@ function Dashboard() {
     if (gmailConnected) {
       // Already connected, fetch emails
       await fetchGmailMessages();
+    } else if (!oauthConfigured) {
+      // OAuth not configured, show setup modal
+      setShowOAuthModal(true);
     } else {
-      // Not connected, initiate OAuth
+      // OAuth configured but not connected, initiate OAuth
       await initiateGoogleOAuth();
     }
   };
@@ -326,8 +451,50 @@ function Dashboard() {
     console.log('Calendar connection toggled');
   };
 
+  const saveOAuthCredentials = async ({ clientId, clientSecret }) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/google/configure', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: 'http://localhost:5000/api/auth/google/callback'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage(`Error: ${data.error || 'Failed to save credentials'}`);
+        return false;
+      }
+
+      setStatusMessage('OAuth credentials saved successfully!');
+      setOauthConfigured(true);
+      
+      // Now initiate OAuth flow
+      setTimeout(() => {
+        initiateGoogleOAuth();
+      }, 500);
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving OAuth credentials:', error);
+      setStatusMessage('Failed to save credentials. Check backend connection.');
+      return false;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] px-4 py-8 sm:px-8">
+    <>
+      <OAuthSetupModal 
+        isOpen={showOAuthModal}
+        onClose={() => setShowOAuthModal(false)}
+        onSave={saveOAuthCredentials}
+      />
+      
+      <div className="min-h-screen bg-[var(--bg-main)] px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -418,6 +585,7 @@ function Dashboard() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

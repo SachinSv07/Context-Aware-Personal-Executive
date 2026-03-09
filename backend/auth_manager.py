@@ -405,4 +405,61 @@ class AuthManager:
             return True
         
         return False
+    
+    def save_oauth_app_config(self, provider, config):
+        """
+        Save OAuth application configuration (Client ID, Secret, etc.)
+        
+        Args:
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            config: Dictionary with oauth app configuration
+                    e.g., {'client_id': '...', 'client_secret': '...', 'redirect_uri': '...'}
+            
+        Returns:
+            bool: True if saved successfully
+        """
+        oauth_config_file = self.data_dir / 'oauth_app_config.json'
+        oauth_configs = self._load_json(oauth_config_file, {})
+        
+        oauth_configs[provider] = {
+            **config,
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        self._save_json(oauth_config_file, oauth_configs)
+        return True
+    
+    def get_oauth_app_config(self, provider):
+        """
+        Get OAuth application configuration for a provider
+        
+        Args:
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            
+        Returns:
+            dict: OAuth app configuration or None if not found
+        """
+        oauth_config_file = self.data_dir / 'oauth_app_config.json'
+        oauth_configs = self._load_json(oauth_config_file, {})
+        
+        return oauth_configs.get(provider)
+    
+    def is_oauth_app_configured(self, provider):
+        """
+        Check if OAuth app is configured for a provider
+        
+        Args:
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            
+        Returns:
+            bool: True if configured, False otherwise
+        """
+        config = self.get_oauth_app_config(provider)
+        
+        if not config:
+            return False
+        
+        # Check if required fields are present
+        required_fields = ['client_id', 'client_secret']
+        return all(field in config and config[field] for field in required_fields)
 
