@@ -14,9 +14,9 @@ import json
 import os
 from urllib import error as url_error
 from urllib import request as url_request
-from typing import Literal
+from typing import Any, Literal
 
-ToolName = Literal["email", "pdf", "csv"]
+ToolName = Literal["email", "pdf", "csv", "drive", "calendar"]
 
 
 def _load_local_env() -> None:
@@ -56,11 +56,11 @@ def _normalize_tool(raw_output: str) -> ToolName:
     """
     text = (raw_output or "").strip().lower()
 
-    if text in {"email", "pdf", "csv"}:
+    if text in {"email", "pdf", "csv", "drive", "calendar"}:
         return text  # type: ignore[return-value]
 
     # Handle longer model output like: "I would choose email"
-    for token in ("email", "pdf", "csv"):
+    for token in ("email", "pdf", "csv", "drive", "calendar"):
         if token in text:
             return token  # type: ignore[return-value]
 
@@ -73,6 +73,10 @@ def _fallback_tool_choice(query: str) -> ToolName:
     q = query.lower()
     if any(k in q for k in ["email", "mail", "inbox", "sender", "subject"]):
         return "email"
+    if any(k in q for k in ["drive", "google drive", "document", "docs", "spreadsheet", "sheet", "slides", "file"]):
+        return "drive"
+    if any(k in q for k in ["calendar", "meeting", "event", "schedule", "appointment", "invite"]):
+        return "calendar"
     if any(k in q for k in ["pdf", "document", "report", "paper", "page"]):
         return "pdf"
     if any(k in q for k in ["csv", "table", "sheet", "row", "column", "note", "notes"]):
@@ -81,7 +85,7 @@ def _fallback_tool_choice(query: str) -> ToolName:
 
 
 def choose_tool(query: str) -> ToolName:
-    """Choose which data source to search: email, pdf, or csv.
+    """Choose which data source to search: email, drive, calendar, pdf, or csv.
 
     Prompt format used:
         A user asked: {query}
@@ -92,6 +96,8 @@ def choose_tool(query: str) -> ToolName:
         email
         pdf
         csv
+        drive
+        calendar
 
         Return only the tool name.
     """
@@ -106,7 +112,9 @@ def choose_tool(query: str) -> ToolName:
         "Options:\n"
         "email\n"
         "pdf\n"
-        "csv\n\n"
+        "csv\n"
+        "drive\n"
+        "calendar\n\n"
         "Return only the tool name."
     )
 
@@ -162,7 +170,7 @@ def choose_tool(query: str) -> ToolName:
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a routing assistant. Return only one word: email, pdf, or csv.",
+                    "content": "You are a routing assistant. Return only one word: email, drive, calendar, pdf, or csv.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -175,21 +183,281 @@ def choose_tool(query: str) -> ToolName:
         return _fallback_tool_choice(query)
 
 
-def _run_tool(tool: ToolName, query: str) -> str:
+def _run_tool(tool: ToolName, query: str) -> Any:
     """Execute selected tool by importing only what is needed."""
     if tool == "email":
+        from tools.gmail_tool import search_gmail
         from tools.email_tool import search_email
 
-        return str(search_email(query))
+        gmail_results = search_gmail(query)
+        if gmail_results:
+            return gmail_results
+
+        return search_email(query)
 
     if tool == "pdf":
         from tools.pdf_tool import search_pdf
 
-        return str(search_pdf(query))
+        return search_pdf(query)
+
+    if tool == "drive":
+        from tools.drive_tool import search_drive
+
+        return search_drive(query)
+
+    if tool == "calendar":
+        from tools.calendar_tool import search_calendar
+
+        return search_calendar(query)
 
     from tools.csv_tool import search_csv
 
-    return str(search_csv(query))
+    return search_csv(query)
+
+
+def _shorten(text: Any, limit: int = 140) -> str:
+    value = str(text or "").strip().replace("\n", " ")
+    if len(value) <= limit:
+        return value
+    return value[: limit - 3] + "..."
+
+
+def _wrap_paragraph(text: str, width: int = 65) -> list[str]:
+    """
+    Wrap text into paragraph format with word boundaries.
+    Returns list of lines that fit within the specified width.
+    """
+    if not text:
+        return []
+    
+    lines = []
+    paragraphs = text.split('\n')
+    
+    for para in paragraphs:
+        if not para.strip():
+            lines.append("")  # Preserve empty lines between paragraphs
+            continue
+        
+        words = para.split()
+        current_line = ""
+        
+        for word in words:
+            # If adding this word would exceed width
+            if current_line and len(current_line) + len(word) + 1 > width:
+                lines.append(current_line)
+                current_line = word
+            else:
+                if current_line:
+                    current_line += " " + word
+                else:
+                    current_line = word
+        
+        # Add the last line of this paragraph
+        if current_line:
+            lines.append(current_line)
+    
+    return lines
+
+
+def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
+    source_map = {
+        "email": "Gmail/Email",
+        "drive": "Google Drive",
+        "calendar": "Google Calendar",
+        "pdf": "PDF",
+        "csv": "CSV",
+    }
+    
+    # Header
+    lines = []
+    lines.append("=" * 70)
+    lines.append(f"SOURCE: {source_map.get(tool, tool)}")
+    lines.append(f"QUERY: {query}")
+    lines.append("=" * 70)
+
+    if not isinstance(result, list) or not result:
+        lines.append("\nMatches: 0")
+        lines.append("\nNo relevant information found.")
+        return "\n".join(lines)
+
+    lines.append(f"\nMatches: {len(result)} found\n")
+
+    # Format each result as a clean block
+    for idx, item in enumerate(result, start=1):
+        if not isinstance(item, dict):
+            lines.append(f"[{idx}] {_shorten(item)}\n")
+            continue
+
+        # EMAIL FORMAT
+        if tool == "email":
+            lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
+            
+            subject = _shorten(item.get('subject', 'N/A'), 60)
+            lines.append(f"| SUBJECT:  {subject:<58} |")
+            
+            sender = _shorten(item.get('from', 'N/A'), 58)
+            lines.append(f"| FROM:     {sender:<58} |")
+            
+            if item.get("date"):
+                date_str = _shorten(item.get('date'), 58)
+                lines.append(f"| DATE:     {date_str:<58} |")
+            
+            lines.append("|" + "-" * 68 + "|")
+            
+            # Show snippet or summary
+            if item.get("snippet"):
+                snippet = _shorten(item.get('snippet'), 65)
+                lines.append(f"| SUMMARY:")
+                lines.append(f"| {snippet:<65} |")
+            
+            # Show FULL content in paragraph format
+            content = item.get("content", "")
+            if content:
+                lines.append("|")
+                lines.append(f"| FULL CONTENT:")
+                lines.append("|")
+                # Wrap content as paragraphs
+                wrapped_lines = _wrap_paragraph(content, 64)
+                for wrapped_line in wrapped_lines:
+                    lines.append(f"| {wrapped_line:<64} |")
+            
+            lines.append("+" + "-" * 68 + "+\n")
+            continue
+
+        # DRIVE FORMAT
+        if tool == "drive":
+            lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
+            
+            name = _shorten(item.get('name', 'N/A'), 58)
+            lines.append(f"| FILE:     {name:<58} |")
+            
+            if item.get("mime_type"):
+                mime = _shorten(item.get('mime_type'), 58)
+                lines.append(f"| TYPE:     {mime:<58} |")
+            
+            if item.get("owner"):
+                owner = _shorten(item.get('owner'), 58)
+                lines.append(f"| OWNER:    {owner:<58} |")
+            
+            if item.get("modified"):
+                modified = _shorten(item.get('modified'), 58)
+                lines.append(f"| MODIFIED: {modified:<58} |")
+            
+            lines.append("|" + "-" * 68 + "|")
+            
+            # Show FULL description in paragraph format
+            if item.get("description"):
+                desc = item.get('description', '')
+                lines.append(f"| DESCRIPTION:")
+                lines.append("|")
+                wrapped_lines = _wrap_paragraph(desc, 64)
+                for wrapped_line in wrapped_lines:
+                    lines.append(f"| {wrapped_line:<64} |")
+            
+            # Show FULL content in paragraph format (extracted from file)
+            if item.get("content"):
+                content = item.get('content', '')
+                lines.append("|")
+                lines.append(f"| FULL CONTENT:")
+                lines.append("|")
+                wrapped_lines = _wrap_paragraph(content, 64)
+                for wrapped_line in wrapped_lines:
+                    lines.append(f"| {wrapped_line:<64} |")
+            
+            if item.get("link"):
+                lines.append("|")
+                link = _shorten(item.get('link'), 65)
+                lines.append(f"| LINK:")
+                lines.append(f"| {link:<65} |")
+            
+            lines.append("+" + "-" * 68 + "+\n")
+            continue
+
+        # CALENDAR FORMAT
+        if tool == "calendar":
+            lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
+            
+            summary = _shorten(item.get('summary', 'N/A'), 58)
+            lines.append(f"| EVENT:    {summary:<58} |")
+            
+            if item.get("start"):
+                start = _shorten(item.get('start'), 58)
+                lines.append(f"| START:    {start:<58} |")
+            
+            if item.get("end"):
+                end = _shorten(item.get('end'), 58)
+                lines.append(f"| END:      {end:<58} |")
+            
+            if item.get("location"):
+                location = _shorten(item.get('location'), 58)
+                lines.append(f"| LOCATION: {location:<58} |")
+            
+            lines.append("|" + "-" * 68 + "|")
+            
+            # Show FULL description in paragraph format
+            if item.get("description"):
+                desc = item.get('description', '')
+                lines.append(f"| DESCRIPTION:")
+                lines.append("|")
+                wrapped_lines = _wrap_paragraph(desc, 64)
+                for wrapped_line in wrapped_lines:
+                    lines.append(f"| {wrapped_line:<64} |")
+            
+            attendees = item.get("attendees") or []
+            if attendees:
+                attendees_str = _shorten(', '.join(str(a) for a in attendees), 65)
+                lines.append(f"| ATTENDEES:")
+                lines.append(f"| {attendees_str:<65} |")
+            
+            if item.get("link"):
+                lines.append("|")
+                link = _shorten(item.get('link'), 65)
+                lines.append(f"| LINK: {link:<59} |")
+            
+            lines.append("+" + "-" * 68 + "+\n")
+            continue
+
+        # PDF FORMAT
+        if tool == "pdf":
+            lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
+            
+            if item.get("source"):
+                source = _shorten(item.get('source'), 58)
+                lines.append(f"| FILE:     {source:<58} |")
+            
+            page = item.get('page', 'N/A')
+            lines.append(f"| PAGE:     {str(page):<58} |")
+            
+            lines.append("|" + "-" * 68 + "|")
+            
+            # Show FULL content in paragraph format (all text)
+            text = item.get('text', '')
+            lines.append(f"| FULL CONTENT:")
+            lines.append("|")
+            wrapped_lines = _wrap_paragraph(text, 64)
+            for wrapped_line in wrapped_lines:
+                lines.append(f"| {wrapped_line:<64} |")
+            
+            lines.append("+" + "-" * 68 + "+\n")
+            continue
+
+        # CSV/DEFAULT FORMAT
+        row_number = item.get("row_number", "N/A")
+        lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
+        lines.append(f"| ROW:      {str(row_number):<58} |")
+        
+        matching_fields = item.get("matching_fields") or []
+        if matching_fields:
+            lines.append("|" + "-" * 68 + "|")
+            lines.append(f"| MATCHING FIELDS:")
+            for field_val in matching_fields[:5]:
+                field_str = _shorten(str(field_val), 62)
+                lines.append(f"|   - {field_str:<62} |")
+        
+        lines.append("+" + "-" * 68 + "+\n")
+
+    lines.append("=" * 70)
+    return "\n".join(lines)
 
 
 def process_query(query: str) -> str:
@@ -204,18 +472,8 @@ def process_query(query: str) -> str:
 
     tool = choose_tool(query)
 
-    # Demo reasoning lines requested for presentation clarity.
-    lines = [f"Tool Selected: {tool}"]
-
-    if tool == "email":
-        lines.append("Searching email records...")
-    elif tool == "pdf":
-        lines.append("Searching PDF records...")
-    else:
-        lines.append("Searching CSV records...")
-
     try:
         result = _run_tool(tool, query)
-        return "\n".join(lines) + "\n\nResult:\n" + result
+        return _format_structured_result(tool, query, result)
     except Exception:
         return "No relevant information found."

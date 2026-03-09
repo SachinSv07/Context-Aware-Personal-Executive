@@ -1,11 +1,44 @@
-"""
-Google Calendar search tool using the Google Calendar API
-Requires OAuth 2.0 credentials (credentials.json) and the google-api-python-client package.
-"""
+"""Google Calendar search tool using the Google Calendar API."""
 
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import List, Dict, Any
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
+from config import MAX_SEARCH_RESULTS, CALENDAR_TOKEN_PATH
 from utils.helpers import log_info, log_error, calculate_similarity
-from config import MAX_SEARCH_RESULTS
+
+
+CALENDAR_SCOPES = [
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+]
+
+
+def _load_calendar_credentials() -> Credentials | None:
+    token_path = Path(CALENDAR_TOKEN_PATH)
+    if not token_path.exists():
+        return None
+
+    try:
+        creds = Credentials.from_authorized_user_file(str(token_path), CALENDAR_SCOPES)
+    except Exception as exc:
+        log_error("Failed to parse Calendar token file", exc)
+        return None
+
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            token_path.write_text(creds.to_json(), encoding="utf-8")
+        except Exception as exc:
+            log_error("Failed to refresh Calendar token", exc)
+            return None
+
+    return creds
 
 
 def search_calendar(query: str) -> List[Dict[str, Any]]:
@@ -18,61 +51,81 @@ def search_calendar(query: str) -> List[Dict[str, Any]]:
     Returns:
         List of matching calendar event records
 
-    TODO:
-        1. Set up OAuth 2.0 flow using google-auth / google-auth-oauthlib
-        2. Build a Calendar API service: googleapiclient.discovery.build('calendar', 'v3', ...)
-        3. Call service.events().list(calendarId='primary', q=query, ...) to fetch events
-        4. Parse summary, start, end, location, description, attendees, htmlLink fields
-        5. Rank by relevance using calculate_similarity on summary vs. query
-        6. Return top MAX_SEARCH_RESULTS results ordered by start time
-        7. Handle token refresh and API errors gracefully
+    Requires prior OAuth connection via backend /auth/google/calendar route.
     """
     log_info(f"Searching Google Calendar for: {query}")
 
     try:
-        # --- Google API setup (placeholder) ---
-        # import datetime
-        # from google.oauth2.credentials import Credentials
-        # from google_auth_oauthlib.flow import InstalledAppFlow
-        # from googleapiclient.discovery import build
-        #
-        # SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-        # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-        # service = build('calendar', 'v3', credentials=creds)
-        #
-        # now = datetime.datetime.utcnow().isoformat() + 'Z'
-        # response = service.events().list(
-        #     calendarId='primary',
-        #     q=query,
-        #     timeMin=now,
-        #     maxResults=MAX_SEARCH_RESULTS,
-        #     singleEvents=True,
-        #     orderBy='startTime'
-        # ).execute()
-        # events = response.get('items', [])
-        # results = []
-        # for event in events:
-        #     start = event['start'].get('dateTime', event['start'].get('date', ''))
-        #     end   = event['end'].get('dateTime',   event['end'].get('date', ''))
-        #     attendees = [a.get('email', '') for a in event.get('attendees', [])]
-        #     score = calculate_similarity(query, event.get('summary', ''))
-        #     results.append({
-        #         'id':          event.get('id', ''),
-        #         'summary':     event.get('summary', ''),
-        #         'start':       start,
-        #         'end':         end,
-        #         'location':    event.get('location', ''),
-        #         'description': event.get('description', ''),
-        #         'attendees':   attendees,
-        #         'link':        event.get('htmlLink', ''),
-        #         'relevance_score': score
-        #     })
-        # results.sort(key=lambda x: x['relevance_score'], reverse=True)
-        # return results[:MAX_SEARCH_RESULTS]
+        creds = _load_calendar_credentials()
+        if not creds:
+            log_error(f"Calendar token not found or invalid: {CALENDAR_TOKEN_PATH}")
+            return []
 
-        # Stub: replace with real API call above
-        log_info("Calendar API not yet configured – returning empty results")
-        return []
+        service = build("calendar", "v3", credentials=creds)
+        now = datetime.now(timezone.utc)
+        time_min = (now - timedelta(days=365)).isoformat()
+        time_max = (now + timedelta(days=365)).isoformat()
+
+        response = service.events().list(
+            calendarId="primary",
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=max(MAX_SEARCH_RESULTS * 3, 10),
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+
+        events = response.get("items", [])
+        results: List[Dict[str, Any]] = []
+        query_lower = query.lower()
+
+        for event in events:
+            summary = event.get("summary", "")
+            description = event.get("description", "")
+            location = event.get("location", "")
+            attendees = [a.get("email", "") for a in event.get("attendees", [])]
+            attendees_text = " ".join(attendees)
+
+            score = 0.0
+            if query:
+                if query_lower in summary.lower():
+                    score += 0.5
+                if description and query_lower in description.lower():
+                    score += 0.3
+                if location and query_lower in location.lower():
+                    score += 0.1
+                if attendees_text and query_lower in attendees_text.lower():
+                    score += 0.1
+                score += calculate_similarity(query, summary) * 0.1
+            else:
+                score = 0.5
+
+            start = event.get("start", {}).get("dateTime", event.get("start", {}).get("date", ""))
+            end = event.get("end", {}).get("dateTime", event.get("end", {}).get("date", ""))
+
+            organizer = event.get("organizer", {})
+            organizer_text = organizer.get("email", "") or organizer.get("displayName", "")
+
+            results.append(
+                {
+                    "id": event.get("id", ""),
+                    "summary": summary,
+                    "start": start,
+                    "end": end,
+                    "location": location,
+                    "description": description,
+                    "attendees": attendees,
+                    "organizer": organizer_text,
+                    "link": event.get("htmlLink", ""),
+                    "source": "Google Calendar",
+                    "relevance_score": score,
+                }
+            )
+
+        results.sort(key=lambda item: item.get("relevance_score", 0.0), reverse=True)
+        top_results = results[:MAX_SEARCH_RESULTS]
+        log_info(f"Found {len(top_results)} matching Calendar events")
+        return top_results
 
     except Exception as e:
         log_error("Error searching Google Calendar", e)

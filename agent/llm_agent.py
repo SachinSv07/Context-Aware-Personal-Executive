@@ -19,7 +19,7 @@ class ContextAwareAgent:
 
     SYSTEM_PROMPT = (
         "You are a helpful AI assistant that searches across multiple personal data sources "
-        "(emails, PDFs, and CSV notes) to answer questions. "
+        "(emails, Google Drive, Google Calendar, PDFs, and CSV notes) to answer questions. "
         "Always use the available tools to find relevant information and cite your sources."
     )
 
