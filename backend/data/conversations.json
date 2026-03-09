@@ -1,0 +1,18 @@
+{
+  "user@example.com": [
+    {
+      "id": "1",
+      "title": "when was my friend birthday",
+      "messages": [
+        {
+          "id": 1773047935957,
+          "role": "user",
+          "content": "when was my friend birthday",
+          "timestamp": "02:48 pm"
+        }
+      ],
+      "createdAt": "2026-03-09T09:18:00.977Z",
+      "updatedAt": "2026-03-09T09:18:55.958Z"
+    }
+  ]
+}

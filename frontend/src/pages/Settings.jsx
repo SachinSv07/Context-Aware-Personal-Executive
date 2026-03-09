@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function Settings() {
+function Settings({ onLogout }) {
   const navigate = useNavigate();
   
   // Mock data - replace with actual data from backend/context
@@ -57,6 +57,22 @@ function Settings() {
                 <p className="text-sm text-slate-400">{userInfo.email}</p>
               </div>
             </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                onLogout();
+                navigate('/');
+              }}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-red-400 hover:text-red-400"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Log Out
+              </div>
+            </button>
           </section>
 
           {/* Connected Services */}

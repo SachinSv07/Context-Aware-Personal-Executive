@@ -520,6 +520,116 @@ def delete_note(note_id):
         return jsonify({'error': str(e)}), 500
 
 
+# ==================== Conversation Endpoints ====================
+
+@app.route('/api/conversations', methods=['GET'])
+def get_conversations():
+    """Get all conversations for the current user"""
+    try:
+        user_email = get_current_user()
+        conversations = auth_manager.get_conversations(user_email)
+        
+        return jsonify({
+            'success': True,
+            'conversations': conversations
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/conversations/save', methods=['POST'])
+def save_conversation():
+    """
+    Save or update a conversation
+    
+    Request body:
+    {
+        "id": "unique-conversation-id",
+        "title": "Conversation Title",
+        "messages": [
+            {"role": "user", "content": "Hello", "timestamp": "2024-01-01T00:00:00Z"},
+            {"role": "assistant", "content": "Hi!", "timestamp": "2024-01-01T00:00:01Z"}
+        ],
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:01Z"
+    }
+    """
+    try:
+        user_email = get_current_user()
+        conversation_data = request.get_json()
+        
+        if not conversation_data or 'id' not in conversation_data:
+            return jsonify({'error': 'Invalid conversation data'}), 400
+        
+        saved_conversation = auth_manager.save_conversation(user_email, conversation_data)
+        
+        return jsonify({
+            'success': True,
+            'conversation': saved_conversation
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/conversations/<conversation_id>', methods=['DELETE'])
+def delete_conversation(conversation_id):
+    """Delete a conversation"""
+    try:
+        user_email = get_current_user()
+        
+        deleted_conversation = auth_manager.delete_conversation(user_email, conversation_id)
+        
+        if not deleted_conversation:
+            return jsonify({'error': 'Conversation not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'message': 'Conversation deleted successfully'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/conversations/<conversation_id>/message', methods=['POST'])
+def add_message_to_conversation(conversation_id):
+    """
+    Add a message to an existing conversation
+    
+    Request body:
+    {
+        "role": "user" or "assistant",
+        "content": "Message content",
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
+    """
+    try:
+        user_email = get_current_user()
+        message_data = request.get_json()
+        
+        if not message_data or 'content' not in message_data or 'role' not in message_data:
+            return jsonify({'error': 'Invalid message data'}), 400
+        
+        updated_conversation = auth_manager.add_message_to_conversation(
+            user_email, 
+            conversation_id, 
+            message_data
+        )
+        
+        if not updated_conversation:
+            return jsonify({'error': 'Conversation not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'conversation': updated_conversation
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== Server Startup ====================
 
 if __name__ == '__main__':
