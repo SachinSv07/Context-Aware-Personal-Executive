@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAuthHeaders } from '../utils/auth';
 
 // Card for text input sources (Email, Notes)
 function TextInputCard({ title, description, value, onChange, buttonText = 'Save', onAction, helpText }) {
@@ -189,11 +190,119 @@ function Dashboard() {
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [calendarConnected, setCalendarConnected] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleEmailFetch = () => {
-    // TODO: Integrate with Gmail API
-    console.log('Fetching from Gmail:', email);
+  // Check OAuth status on mount
+  useEffect(() => {
+    checkGmailStatus();
+    
+    // Check for OAuth callback messages
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthStatus = urlParams.get('oauth');
+    const oauthMessage = urlParams.get('message');
+    
+    if (oauthStatus === 'success') {
+      setStatusMessage('Successfully connected to Gmail!');
+      setGmailConnected(true);
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/dashboard');
+    } else if (oauthStatus === 'error') {
+      setStatusMessage(`OAuth Error: ${oauthMessage || 'Unknown error'}`);
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, []);
+
+  const checkGmailStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/google/status', {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      setGmailConnected(data.connected || false);
+    } catch (error) {
+      console.error('Error checking Gmail status:', error);
+    }
+  };
+
+  const handleEmailFetch = async () => {
+    if (gmailConnected) {
+      // Already connected, fetch emails
+      await fetchGmailMessages();
+    } else {
+      // Not connected, initiate OAuth
+      await initiateGoogleOAuth();
+    }
+  };
+
+  const initiateGoogleOAuth = async () => {
+    setGmailLoading(true);
+    setStatusMessage('Initiating Google authentication...');
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/google/initiate', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email: email || undefined })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Failed to initiate OAuth');
+        if (data.setup_guide) {
+          setStatusMessage(`${data.error}\n\nSee: ${data.setup_guide}`);
+        }
+        setGmailLoading(false);
+        return;
+      }
+
+      // Open Google authorization page
+      setStatusMessage('Opening Google authorization page...');
+      window.location.href = data.authorization_url;
+
+    } catch (error) {
+      console.error('OAuth initiation error:', error);
+      setStatusMessage('Failed to connect to server. Make sure backend is running.');
+      setGmailLoading(false);
+    }
+  };
+
+  const fetchGmailMessages = async () => {
+    setGmailLoading(true);
+    setStatusMessage('Fetching Gmail messages...');
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/gmail/fetch', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ max_results: 20 })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.auth_required) {
+          // Need to authenticate first
+          await initiateGoogleOAuth();
+          return;
+        }
+        setStatusMessage(data.error || 'Failed to fetch emails');
+        setGmailLoading(false);
+        return;
+      }
+
+      setStatusMessage(`Successfully fetched ${data.count} emails!`);
+      console.log('Gmail messages:', data.messages);
+      setGmailLoading(false);
+
+    } catch (error) {
+      console.error('Gmail fetch error:', error);
+      setStatusMessage('Failed to fetch emails. Please try again.');
+      setGmailLoading(false);
+    }
   };
 
   const handleNotesSave = () => {
@@ -235,16 +344,53 @@ function Dashboard() {
           </button>
         </div>
 
+        {/* Status Message */}
+        {statusMessage && (
+          <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+            statusMessage.includes('Success') 
+              ? 'border-teal-500/30 bg-teal-500/10 text-teal-300'
+              : statusMessage.includes('Error')
+              ? 'border-red-500/30 bg-red-500/10 text-red-300'
+              : 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+          }`}>
+            {statusMessage}
+          </div>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2">
-          <TextInputCard
-            title="Gmail Account"
-            description="Connect your Gmail inbox for email context ingestion."
-            helpText="User authentication via Google OAuth 2.0. Click 'Fetch from Gmail' to authorize access to your inbox securely."
-            value={email}
-            onChange={setEmail}
-            buttonText="Fetch from Gmail"
-            onAction={handleEmailFetch}
-          />
+          <div className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-5 shadow-lg transition hover:border-slate-500">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-100">Gmail Account</h3>
+                <p className="mt-1 text-sm text-slate-400">Connect your Gmail inbox for email context ingestion.</p>
+              </div>
+              {gmailConnected && (
+                <span className="flex items-center gap-2 text-xs text-teal-400">
+                  <span className="h-2 w-2 rounded-full bg-teal-400" />
+                  Connected
+                </span>
+              )}
+            </div>
+            <div className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-500">
+              💡 User authentication via Google OAuth 2.0. Click 'Connect Gmail' to authorize access to your inbox securely.
+            </div>
+            {!gmailConnected && (
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none"
+                placeholder="Your email (optional)"
+              />
+            )}
+            <button
+              type="button"
+              onClick={handleEmailFetch}
+              disabled={gmailLoading}
+              className="mt-4 rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {gmailLoading ? 'Connecting...' : gmailConnected ? 'Fetch Emails' : 'Connect Gmail'}
+            </button>
+          </div>
 
           <FileUploadCard
             title="PDF Upload"

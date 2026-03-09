@@ -4,6 +4,7 @@ import ChatInput from '../components/ChatInput';
 import ChatWindow from '../components/ChatWindow';
 import Sidebar from '../components/Sidebar';
 import { useChat } from '../context/ChatContext';
+import { getAuthHeaders } from '../utils/auth';
 
 const createTimestamp = () =>
   new Date().toLocaleTimeString([], {
@@ -42,9 +43,7 @@ function ChatPage() {
     // Call backend API
     fetch('http://localhost:5000/api/query', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ query: text }),
     })
       .then((response) => {

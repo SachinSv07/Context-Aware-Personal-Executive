@@ -6,6 +6,12 @@
 # Google Gemini for LLM agent
 google-genai>=1.0.0
 
+# Google OAuth and APIs
+google-auth>=2.22.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.95.0
+
 # Web frameworks (choose one or both)
 streamlit>=1.28.0
 flask>=3.0.0
