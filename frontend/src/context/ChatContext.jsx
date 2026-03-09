@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getAuthHeaders } from '../utils/auth';
 
 const ChatContext = createContext(null);
@@ -28,21 +28,7 @@ export function ChatProvider({ children }) {
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) || chats[0];
 
-  // Load conversations from backend on mount and when auth changes
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      loadConversations();
-    } else {
-      // No auth, start with default empty chat
-      const defaultChat = createChat(1);
-      setChats([defaultChat]);
-      setActiveChatId('1');
-      setIsLoading(false);
-    }
-  }, []);
-
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/conversations`, {
         method: 'GET',
@@ -54,6 +40,7 @@ export function ChatProvider({ children }) {
       }
 
       const data = await response.json();
+      console.log('Loaded conversations:', data);
       
       if (data.success && data.conversations && data.conversations.length > 0) {
         // Update counter to be higher than any existing ID
@@ -84,7 +71,21 @@ export function ChatProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Load conversations from backend on mount and when auth changes
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadConversations();
+    } else {
+      // No auth, start with default empty chat
+      const defaultChat = createChat(1);
+      setChats([defaultChat]);
+      setActiveChatId('1');
+      setIsLoading(false);
+    }
+  }, [loadConversations]);
 
   const saveConversation = async (conversation) => {
     try {

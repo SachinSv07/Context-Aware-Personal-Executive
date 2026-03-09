@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
 import ChatWindow from '../components/ChatWindow';
@@ -23,8 +23,18 @@ function ChatPage() {
     selectChat,
     addMessage,
     clearActiveChat,
+    reloadConversations,
   } = useChat();
   const navigate = useNavigate();
+
+  // Reload conversations when navigating to ChatPage
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token && reloadConversations) {
+      console.log('ChatPage: Reloading conversations...');
+      reloadConversations();
+    }
+  }, []); // Empty dependency array - only run once on mount
 
   const handleSend = (text) => {
     if (!activeChat) {
