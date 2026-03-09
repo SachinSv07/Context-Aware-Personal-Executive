@@ -1,9 +1,5 @@
-"""
-Agent package for AI-powered query handling
-Developer 2 works primarily in this folder
-"""
+"""Agent package exports."""
 
-from .llm_agent import ContextAwareAgent
-from .tool_registry import ToolRegistry
+from .agent import process_query
 
-__all__ = ['ContextAwareAgent', 'ToolRegistry']
+__all__ = ["process_query"]
