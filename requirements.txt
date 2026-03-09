@@ -6,9 +6,14 @@
 # Google Gemini for LLM agent
 google-genai>=1.0.0
 
+# Google OAuth + API clients (Gmail, Drive, Calendar)
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.100.0
+
 # Web frameworks (choose one or both)
 streamlit>=1.28.0
 flask>=3.0.0
+flask-cors>=4.0.0
 
 # PDF processing (Developer 1: uncomment when implementing PDF tool)
 # PyPDF2>=3.0.0

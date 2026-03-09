@@ -61,3 +61,4 @@ htmlcov/
 # User data (if storing actual personal data)
 sample_data/*.pdf
 !sample_data/README_PDF.txt
+sample_data/gmail_token.json

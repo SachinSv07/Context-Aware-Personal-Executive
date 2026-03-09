@@ -14,7 +14,7 @@ import json
 import os
 from urllib import error as url_error
 from urllib import request as url_request
-from typing import Literal
+from typing import Any, Literal
 
 ToolName = Literal["email", "pdf", "csv"]
 
@@ -175,21 +175,94 @@ def choose_tool(query: str) -> ToolName:
         return _fallback_tool_choice(query)
 
 
-def _run_tool(tool: ToolName, query: str) -> str:
+def _run_tool(tool: ToolName, query: str) -> Any:
     """Execute selected tool by importing only what is needed."""
     if tool == "email":
+        from tools.gmail_tool import search_gmail
         from tools.email_tool import search_email
 
-        return str(search_email(query))
+        gmail_results = search_gmail(query)
+        if gmail_results:
+            return gmail_results
+
+        return search_email(query)
 
     if tool == "pdf":
         from tools.pdf_tool import search_pdf
 
-        return str(search_pdf(query))
+        return search_pdf(query)
 
     from tools.csv_tool import search_csv
 
-    return str(search_csv(query))
+    return search_csv(query)
+
+
+def _shorten(text: Any, limit: int = 140) -> str:
+    value = str(text or "").strip().replace("\n", " ")
+    if len(value) <= limit:
+        return value
+    return value[: limit - 3] + "..."
+
+
+def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
+    source_map = {"email": "Gmail/Email", "pdf": "PDF", "csv": "CSV"}
+    lines = [
+        f"Source: {source_map.get(tool, tool)}",
+        f"Query: {query}",
+    ]
+
+    if not isinstance(result, list) or not result:
+        lines.append("Matches: 0")
+        lines.append("")
+        lines.append("No relevant information found.")
+        return "\n".join(lines)
+
+    lines.append(f"Matches: {len(result)}")
+    lines.append("")
+    lines.append("Top Results:")
+
+    for idx, item in enumerate(result, start=1):
+        if not isinstance(item, dict):
+            lines.append(f"{idx}. {_shorten(item)}")
+            continue
+
+        if tool == "email":
+            lines.append(f"{idx}. Subject: {_shorten(item.get('subject', 'N/A'), 100)}")
+            lines.append(f"   From: {_shorten(item.get('from', 'N/A'), 90)}")
+            if item.get("date"):
+                lines.append(f"   Date: {_shorten(item.get('date'), 60)}")
+            if item.get("snippet"):
+                lines.append(f"   Snippet: {_shorten(item.get('snippet'), 160)}")
+            content = item.get("content")
+            if content:
+                lines.append(f"   Content: {_shorten(content, 700)}")
+            if item.get("relevance_score") is not None:
+                try:
+                    lines.append(f"   Relevance: {float(item.get('relevance_score')):.2f}")
+                except (TypeError, ValueError):
+                    pass
+            continue
+
+        if tool == "pdf":
+            lines.append(f"{idx}. Page: {item.get('page', 'N/A')}")
+            lines.append(f"   Text: {_shorten(item.get('text', ''), 180)}")
+            if item.get("source"):
+                lines.append(f"   File: {_shorten(item.get('source'), 80)}")
+            continue
+
+        row_number = item.get("row_number", "N/A")
+        lines.append(f"{idx}. Row: {row_number}")
+        matching_fields = item.get("matching_fields") or []
+        if matching_fields:
+            lines.append(f"   Matching fields: {', '.join(str(field) for field in matching_fields)}")
+        data = item.get("data") or {}
+        if isinstance(data, dict) and data:
+            preview_pairs = []
+            for key, value in list(data.items())[:3]:
+                preview_pairs.append(f"{key}={_shorten(value, 40)}")
+            lines.append(f"   Data: {' | '.join(preview_pairs)}")
+
+    return "\n".join(lines)
 
 
 def process_query(query: str) -> str:
@@ -204,18 +277,8 @@ def process_query(query: str) -> str:
 
     tool = choose_tool(query)
 
-    # Demo reasoning lines requested for presentation clarity.
-    lines = [f"Tool Selected: {tool}"]
-
-    if tool == "email":
-        lines.append("Searching email records...")
-    elif tool == "pdf":
-        lines.append("Searching PDF records...")
-    else:
-        lines.append("Searching CSV records...")
-
     try:
         result = _run_tool(tool, query)
-        return "\n".join(lines) + "\n\nResult:\n" + result
+        return _format_structured_result(tool, query, result)
     except Exception:
         return "No relevant information found."

@@ -25,6 +25,7 @@ GEMINI_MODEL = "gemini-2.0-flash"  # or "gemini-1.5-pro" for higher quality
 EMAIL_DATA_PATH = SAMPLE_DATA_DIR / "emails.json"
 PDF_DATA_PATH = SAMPLE_DATA_DIR / "documents.pdf"
 CSV_DATA_PATH = SAMPLE_DATA_DIR / "notes.csv"
+GMAIL_TOKEN_PATH = SAMPLE_DATA_DIR / "gmail_token.json"
 
 # Search settings
 MAX_SEARCH_RESULTS = 5

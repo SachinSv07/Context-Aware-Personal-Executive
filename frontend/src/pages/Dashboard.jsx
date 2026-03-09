@@ -1,5 +1,7 @@
-import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+const BACKEND = 'http://localhost:5000';
 
 /* ─── small icon helpers (inline SVG, no extra deps) ─── */
 function CheckIcon() {
@@ -206,13 +208,41 @@ function Dashboard() {
   // Indexing state
   const [indexed, setIndexed] = useState(false);
   const [indexing, setIndexing] = useState(false);
+  const location = useLocation();
+
+  // Detect ?gmail=connected redirect back from OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('gmail') === 'connected') {
+      setConnected((prev) => ({ ...prev, gmail: true }));
+      // Clean the query string from the URL without a full reload
+      window.history.replaceState({}, '', '/dashboard');
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    fetch(`${BACKEND}/auth/status`)
+      .then((response) => response.json())
+      .then((status) => {
+        if (status.gmail) {
+          setConnected((prev) => ({ ...prev, gmail: true }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleConnect = (key) => {
-    // Placeholder – wire up real OAuth redirect here
+    if (key === 'gmail') {
+      // Real OAuth: navigate browser to backend → Google consent screen
+      window.location.href = `${BACKEND}/auth/google`;
+      return;
+    }
+    // Drive / Calendar: placeholder until their OAuth routes are wired
     setConnected((prev) => ({ ...prev, [key]: true }));
   };
 
   const handleDisconnect = (key) => {
+    fetch(`${BACKEND}/auth/disconnect/${key}`, { method: 'POST' }).catch(() => {});
     setConnected((prev) => ({ ...prev, [key]: false }));
   };
 

@@ -5,6 +5,7 @@ Developer 2: This connects your agent to Developer 1's tools
 
 from typing import Dict, Callable, List, Any
 from tools.email_tool import search_email, EMAIL_TOOL_SPEC
+from tools.gmail_tool import search_gmail, GMAIL_TOOL_SPEC
 from tools.pdf_tool import search_pdf, PDF_TOOL_SPEC
 from tools.csv_tool import search_csv, CSV_TOOL_SPEC
 from utils.helpers import log_info
@@ -30,6 +31,10 @@ class ToolRegistry:
         # Register email search tool
         self.tools["search_email"] = search_email
         self.tool_specs.append(EMAIL_TOOL_SPEC)
+
+        # Register Gmail search tool
+        self.tools["search_gmail"] = search_gmail
+        self.tool_specs.append(GMAIL_TOOL_SPEC)
         
         # Register PDF search tool
         self.tools["search_pdf"] = search_pdf
