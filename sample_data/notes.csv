@@ -1,0 +1,11 @@
+date,category,title,content,priority
+2026-03-08,work,Team standup,Discussed progress on Context-Aware Personal Executive project. Need to finalize PDF search implementation.,high
+2026-03-07,personal,Dentist appointment,Scheduled for March 20 at 3 PM. Remember to bring insurance card.,medium
+2026-03-06,work,Code review notes,Reviewed Sarah's PR for email tool. Suggested adding error handling for malformed JSON.,medium
+2026-03-05,hackathon,Ideas brainstorm,Potential features: voice input integration real-time notifications calendar sync,low
+2026-03-04,work,Client meeting notes,Client wants semantic search across all documents. Discussed using embeddings for better results.,high
+2026-03-03,personal,Book recommendations,Read: 'Designing Data-Intensive Applications' and 'Building LLM Applications',medium
+2026-03-02,work,Budget planning,Q2 budget allocated: $50k for cloud infrastructure $20k for API costs,high
+2026-03-01,hackathon,Tech stack decisions,Chosen: Python OpenAI GPT-4 Streamlit for frontend PyPDF2 for document parsing,high
+2026-02-28,work,Performance metrics,API response time: avg 1.2s User satisfaction: 4.5/5 stars,medium
+2026-02-27,personal,Gym schedule,Monday Wednesday Friday: strength training. Tuesday Thursday: cardio.,low
