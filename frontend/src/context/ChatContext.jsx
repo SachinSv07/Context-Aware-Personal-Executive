@@ -28,9 +28,18 @@ export function ChatProvider({ children }) {
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) || chats[0];
 
-  // Load conversations from backend on mount
+  // Load conversations from backend on mount and when auth changes
   useEffect(() => {
-    loadConversations();
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadConversations();
+    } else {
+      // No auth, start with default empty chat
+      const defaultChat = createChat(1);
+      setChats([defaultChat]);
+      setActiveChatId('1');
+      setIsLoading(false);
+    }
   }, []);
 
   const loadConversations = async () => {
@@ -220,6 +229,7 @@ export function ChatProvider({ children }) {
     addMessage,
     clearActiveChat,
     deleteChat,
+    reloadConversations: loadConversations,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
