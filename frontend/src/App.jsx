@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import ChatPage from './pages/ChatPage';
+import Settings from './pages/Settings';
 import { ChatProvider } from './context/ChatContext';
 
 function ProtectedRoute({ isAuthenticated, children }) {
@@ -32,6 +33,14 @@ function App() {
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
               <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated}>
+              <Settings />
             </ProtectedRoute>
           }
         />
