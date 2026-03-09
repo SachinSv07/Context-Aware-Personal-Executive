@@ -2,11 +2,16 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Card for text input sources (Email, Notes)
-function TextInputCard({ title, description, value, onChange, buttonText = 'Save', onAction }) {
+function TextInputCard({ title, description, value, onChange, buttonText = 'Save', onAction, helpText }) {
   return (
     <div className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-5 shadow-lg transition hover:border-slate-500">
       <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
       <p className="mt-1 text-sm text-slate-400">{description}</p>
+      {helpText && (
+        <div className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-500">
+          💡 {helpText}
+        </div>
+      )}
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -164,19 +169,11 @@ function Dashboard() {
           <TextInputCard
             title="Gmail Account"
             description="Connect your Gmail inbox for email context ingestion."
+            helpText="User authentication via Google OAuth 2.0. Click 'Fetch from Gmail' to authorize access to your inbox securely."
             value={email}
             onChange={setEmail}
             buttonText="Fetch from Gmail"
             onAction={handleEmailFetch}
-          />
-
-          <TextInputCard
-            title="Notes Text"
-            description="Add raw notes to help your assistant understand your priorities."
-            value={notes}
-            onChange={setNotes}
-            buttonText="Save Notes"
-            onAction={handleNotesSave}
           />
 
           <FileUploadCard
@@ -196,6 +193,15 @@ function Dashboard() {
             description="Sync your calendar events for scheduling and time management."
             onConnect={handleCalendarConnect}
             isConnected={calendarConnected}
+          />
+
+          <TextInputCard
+            title="Notes Text"
+            description="Add raw notes to help your assistant understand your priorities."
+            value={notes}
+            onChange={setNotes}
+            buttonText="Save Notes"
+            onAction={handleNotesSave}
           />
         </div>
       </div>
