@@ -39,17 +39,41 @@ function ChatPage() {
     addMessage(activeChat.id, userMessage);
     setIsLoading(true);
 
-    // Simulates an async AI response while backend integration is pending.
-    window.setTimeout(() => {
-      const aiMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: `I received: "${text}". I can help summarize emails, organize notes, and draft actions from your context.`,
-        timestamp: createTimestamp(),
-      };
-      addMessage(activeChat.id, aiMessage);
-      setIsLoading(false);
-    }, 950);
+    // Call backend API
+    fetch('http://localhost:5000/api/query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: text }),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        const aiMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: data.response || 'No response from server',
+          timestamp: createTimestamp(),
+        };
+        addMessage(activeChat.id, aiMessage);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error calling backend:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error connecting to the backend. Please make sure the server is running.',
+          timestamp: createTimestamp(),
+        };
+        addMessage(activeChat.id, errorMessage);
+        setIsLoading(false);
+      });
   };
 
   return (
