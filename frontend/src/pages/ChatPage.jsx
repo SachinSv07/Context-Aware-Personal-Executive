@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
 import ChatWindow from '../components/ChatWindow';
@@ -23,16 +23,8 @@ function ChatPage() {
     selectChat,
     addMessage,
     clearActiveChat,
-    reloadConversations,
   } = useChat();
   const navigate = useNavigate();
-
-  // Reload conversations when ChatPage mounts (after login)
-  useEffect(() => {
-    if (reloadConversations) {
-      reloadConversations();
-    }
-  }, [reloadConversations]);
 
   const handleSend = (text) => {
     if (!activeChat) {
