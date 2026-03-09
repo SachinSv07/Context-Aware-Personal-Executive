@@ -36,18 +36,18 @@ function OAuthSetupModal({ isOpen, onClose, onSave }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Google OAuth Setup</h2>
-            <p className="mt-1 text-sm text-slate-400">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-6 shadow-2xl my-8">
+        <div className="mb-4 flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-white">Google OAuth Setup</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
               Enter your Google Cloud OAuth credentials to enable Gmail integration
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 flex-shrink-0"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -494,18 +494,18 @@ function Dashboard() {
         onSave={saveOAuthCredentials}
       />
       
-      <div className="min-h-screen bg-[var(--bg-main)] px-4 py-8 sm:px-8">
+      <div className="min-h-screen bg-[var(--bg-main)] px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+        <div className="mb-6 sm:mb-8 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex-1 min-w-0">
             <p className="text-xs uppercase tracking-[0.2em] text-teal-300">Dashboard</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Add your data sources</h1>
+            <h1 className="mt-2 text-2xl sm:text-3xl font-semibold text-white">Add your data sources</h1>
             <p className="mt-2 text-sm text-slate-400">All inputs are optional. Add only what you need before starting chat.</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/chat')}
-            className="rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:brightness-110"
+            className="rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:brightness-110 w-full sm:w-auto flex-shrink-0"
           >
             Continue to Chat
           </button>
@@ -524,7 +524,7 @@ function Dashboard() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-5 shadow-lg transition hover:border-slate-500">
             <div className="flex items-start justify-between">
               <div>

@@ -4,7 +4,7 @@ function Sidebar({ chats, activeChatId, onSelectChat, onNewChat }) {
   const navigate = useNavigate();
 
   return (
-    <aside className="flex h-full w-full flex-col border-r border-slate-800 bg-[var(--surface-1)] p-3 sm:w-72">
+    <aside className="flex h-full w-full flex-col border-r border-slate-800 bg-[var(--surface-1)] p-3 md:w-72">
       <div className="mb-4 rounded-2xl bg-slate-900/60 p-4">
         <h1 className="text-lg font-bold text-white">ContextIQ</h1>
         <p className="text-xs text-slate-400">Context-Aware Personal Executive</p>

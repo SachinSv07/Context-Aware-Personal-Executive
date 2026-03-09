@@ -14,6 +14,7 @@ const createTimestamp = () =>
 
 function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
     chats,
     activeChat,
@@ -77,20 +78,61 @@ function ChatPage() {
 
   return (
     <div className="h-screen bg-[var(--bg-main)] text-slate-100">
-      <div className="flex h-full flex-col sm:flex-row">
-        <div className="h-64 sm:h-full">
-          <Sidebar
-            chats={chats}
-            activeChatId={activeChatId}
-            onSelectChat={selectChat}
-            onNewChat={createNewChat}
-          />
+      <div className="flex h-full flex-col md:flex-row">
+        {/* Mobile Sidebar Toggle */}
+        <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-[var(--surface-2)]/90 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="rounded-lg p-2 transition hover:bg-slate-800"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h2 className="text-sm font-medium text-slate-300">{activeChat?.title || 'Conversation'}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-teal-400 hover:text-teal-300"
+          >
+            Dashboard
+          </button>
+        </div>
+
+        {/* Sidebar */}
+        <div className={`${
+          sidebarOpen ? 'fixed inset-0 z-50 md:relative' : 'hidden md:block'
+        } md:h-full`}>
+          {sidebarOpen && (
+            <div 
+              className="absolute inset-0 bg-black/50 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <div className={`${
+            sidebarOpen ? 'relative w-72' : 'w-full md:w-72'
+          } h-full`}>
+            <Sidebar
+              chats={chats}
+              activeChatId={activeChatId}
+              onSelectChat={(chatId) => {
+                selectChat(chatId);
+                setSidebarOpen(false);
+              }}
+              onNewChat={() => {
+                createNewChat();
+                setSidebarOpen(false);
+              }}
+            />
+          </div>
         </div>
 
         <main className="flex min-h-0 flex-1 flex-col">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-6">
-            <h2 className="text-sm font-medium text-slate-300">{activeChat?.title || 'Conversation'}</h2>
-            <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:px-6">
+            <h2 className="text-sm font-medium text-slate-300 truncate">{activeChat?.title || 'Conversation'}</h2>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
                 onClick={clearActiveChat}

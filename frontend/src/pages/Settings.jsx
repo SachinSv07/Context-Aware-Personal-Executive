@@ -21,40 +21,40 @@ function Settings({ onLogout }) {
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-slate-100">
       {/* Header */}
-      <div className="border-b border-slate-800 bg-[var(--surface-2)]/90 px-4 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="border-b border-slate-800 bg-[var(--surface-2)]/90 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
             <button
               type="button"
               onClick={() => navigate('/chat')}
-              className="rounded-lg p-2 transition hover:bg-slate-800"
+              className="rounded-lg p-2 transition hover:bg-slate-800 flex-shrink-0"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div>
-              <h1 className="text-xl font-semibold">Settings & Profile</h1>
-              <p className="text-sm text-slate-400">Manage your account and data sources</p>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold truncate">Settings & Profile</h1>
+              <p className="text-xs sm:text-sm text-slate-400">Manage your account and data sources</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="px-4 py-8 sm:px-8">
-        <div className="mx-auto max-w-4xl space-y-6">
+      <div className="px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
+        <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
           {/* Profile Section */}
-          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-6">
-            <div className="mb-4 flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-400/20">
-                <svg className="h-8 w-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-4 sm:p-6">
+            <div className="mb-4 flex items-center gap-3 sm:gap-4">
+              <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-teal-400/20 flex-shrink-0">
+                <svg className="h-6 w-6 sm:h-8 sm:w-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-100">Profile</h2>
-                <p className="text-sm text-slate-400">{userInfo.email}</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-100">Profile</h2>
+                <p className="text-xs sm:text-sm text-slate-400 truncate">{userInfo.email}</p>
               </div>
             </div>
             
@@ -76,8 +76,8 @@ function Settings({ onLogout }) {
           </section>
 
           {/* Connected Services */}
-          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-6">
-            <h2 className="mb-4 text-lg font-semibold text-slate-100">Connected Services</h2>
+          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-4 sm:p-6">
+            <h2 className="mb-3 sm:mb-4 text-base sm:text-lg font-semibold text-slate-100">Connected Services</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -138,7 +138,7 @@ function Settings({ onLogout }) {
           </section>
 
           {/* Uploaded Files */}
-          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-6">
+          <section className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold text-slate-100">Uploaded Files</h2>
             <div className="space-y-2">
               {userInfo.uploadedFiles.pdfs.map((filename, index) => (

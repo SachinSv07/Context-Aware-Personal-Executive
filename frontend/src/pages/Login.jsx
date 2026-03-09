@@ -51,15 +51,15 @@ function Login({ onAuthSuccess }) {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#1f2937,_#020617_55%)] px-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#1f2937,_#020617_55%)] px-4 py-8">
       <div className="pointer-events-none absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_50%,rgba(20,184,166,0.18),transparent_35%,rgba(56,189,248,0.12),transparent_70%)]" />
 
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/80 p-8 shadow-2xl backdrop-blur"
+        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/80 p-6 sm:p-8 shadow-2xl backdrop-blur"
       >
         <p className="text-xs uppercase tracking-[0.2em] text-teal-300">ContextIQ</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
+        <h1 className="mt-3 text-2xl sm:text-3xl font-semibold text-white">
           {isSignup ? 'Create account' : 'Welcome back'}
         </h1>
         <p className="mt-2 text-sm text-slate-400">

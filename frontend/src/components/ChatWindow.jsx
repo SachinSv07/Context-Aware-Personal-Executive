@@ -22,9 +22,9 @@ function ChatWindow({ messages, isLoading }) {
 
   if (!messages.length) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center">
-        <div className="animate-fade-in">
-          <h2 className="text-2xl font-semibold text-slate-100">Start a new conversation</h2>
+      <div className="flex flex-1 items-center justify-center px-4 sm:px-6 text-center">
+        <div className="animate-fade-in max-w-md">
+          <h2 className="text-xl sm:text-2xl font-semibold text-slate-100">Start a new conversation</h2>
           <p className="mt-2 text-sm text-slate-400">Ask anything and your assistant will respond with context-aware guidance.</p>
         </div>
       </div>
@@ -32,8 +32,8 @@ function ChatWindow({ messages, isLoading }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-4">
+    <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
+      <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:gap-4">
         {messages.map((message) => (
           <MessageBubble
             key={message.id}
