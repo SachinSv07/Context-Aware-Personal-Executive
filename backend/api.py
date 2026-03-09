@@ -3,7 +3,7 @@ Flask API Backend for React Frontend
 Connects React UI to Python Agent
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 import sys
 from pathlib import Path
@@ -16,6 +16,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agent import process_query
 from backend.auth_manager import AuthManager
+
+try:
+    from backend.oauth_helper import (
+        get_authorization_url,
+        get_credentials_from_code,
+        credentials_to_dict,
+        dict_to_credentials,
+        fetch_gmail_messages
+    )
+    OAUTH_AVAILABLE = True
+except ImportError:
+    OAUTH_AVAILABLE = False
+    print("Warning: Google OAuth dependencies not installed. Gmail integration disabled.")
+    print("Run: pip install -r requirements.txt to enable OAuth features.")
 
 app = Flask(__name__)
 CORS(app)  # Allow React frontend to call this API
@@ -39,10 +53,42 @@ def allowed_file(filename):
 
 
 def get_current_user():
-    """Get current user from request (simplified - use JWT in production)"""
-    # In production, decode JWT token from Authorization header
-    # For now, return demo user
-    return 'user@example.com'
+    """
+    Get current user email from request Authorization header
+    
+    Token format: token_{email}_{timestamp}
+    
+    Returns:
+        str: User email address
+        
+    Raises:
+        Exception: If no valid token is provided
+    """
+    auth_header = request.headers.get('Authorization')
+    
+    if not auth_header:
+        raise Exception('No authorization token provided')
+    
+    # Extract token (format: "Bearer token_{email}_{timestamp}" or just "token_{email}_{timestamp}")
+    token = auth_header.replace('Bearer ', '').strip()
+    
+    # Parse token to extract email
+    # Token format: token_{email}_{timestamp}
+    if not token.startswith('token_'):
+        raise Exception('Invalid token format')
+    
+    parts = token.split('_')
+    if len(parts) < 3:
+        raise Exception('Invalid token format')
+    
+    # Email is between "token_" and the timestamp
+    # Join all parts except first (token) and last (timestamp)
+    email = '_'.join(parts[1:-1])
+    
+    if not email:
+        raise Exception('No user email in token')
+    
+    return email
 
 
 # ==================== Health & Query Endpoints ====================
@@ -514,6 +560,172 @@ def delete_note(note_id):
         return jsonify({
             'success': True,
             'message': 'Note deleted successfully'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== Google OAuth Endpoints ====================
+
+@app.route('/api/auth/google/initiate', methods=['POST'])
+def initiate_google_oauth():
+    """
+    Initiate Google OAuth flow
+    
+    Request body:
+    {
+        "email": "user@example.com"
+    }
+    
+    Response:
+    {
+        "authorization_url": "https://accounts.google.com/o/oauth2/auth?...",
+        "success": true
+    }
+    """
+    if not OAUTH_AVAILABLE:
+        return jsonify({
+            'error': 'Google OAuth not configured. Please install required packages and set up credentials.',
+            'setup_guide': 'See backend/OAUTH_SETUP.md for instructions'
+        }), 503
+    
+    try:
+        data = request.get_json()
+        user_email = data.get('email') or get_current_user()
+        
+        # Generate authorization URL
+        authorization_url, state = get_authorization_url(user_email)
+        
+        return jsonify({
+            'authorization_url': authorization_url,
+            'success': True
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/google/callback', methods=['GET'])
+def google_oauth_callback():
+    """
+    Handle Google OAuth callback
+    
+    This endpoint receives the authorization code from Google
+    and exchanges it for access tokens
+    """
+    if not OAUTH_AVAILABLE:
+        return redirect('http://localhost:3000/dashboard?oauth=error&message=OAuth+not+configured')
+    
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')  # This contains the user_email
+        error = request.args.get('error')
+        
+        if error:
+            return redirect(f'http://localhost:3000/dashboard?oauth=error&message={error}')
+        
+        if not code or not state:
+            return redirect('http://localhost:3000/dashboard?oauth=error&message=Missing+authorization+code')
+        
+        # Exchange code for credentials
+        credentials = get_credentials_from_code(code, state)
+        
+        # Convert credentials to dictionary for storage
+        creds_dict = credentials_to_dict(credentials)
+        
+        # Store credentials in auth_manager
+        user_email = state  # We passed user_email as state
+        auth_manager.store_oauth_credentials(user_email, 'google', creds_dict)
+        
+        # Redirect to frontend success page
+        return redirect('http://localhost:3000/dashboard?oauth=success')
+    
+    except Exception as e:
+        error_message = str(e).replace(' ', '+')
+        return redirect(f'http://localhost:3000/dashboard?oauth=error&message={error_message}')
+
+
+@app.route('/api/auth/google/status', methods=['GET'])
+def google_oauth_status():
+    """
+    Check if user has connected Google OAuth
+    
+    Response:
+    {
+        "connected": true,
+        "email": "user@gmail.com"
+    }
+    """
+    try:
+        user_email = get_current_user()
+        credentials = auth_manager.get_oauth_credentials(user_email, 'google')
+        
+        if credentials:
+            return jsonify({
+                'connected': True,
+                'provider': 'google'
+            })
+        else:
+            return jsonify({
+                'connected': False
+            })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/gmail/fetch', methods=['POST'])
+def fetch_gmail():
+    """
+    Fetch Gmail messages for the authenticated user
+    
+    Request body:
+    {
+        "max_results": 20,
+        "query": "is:unread"  // optional Gmail search query
+    }
+    
+    Response:
+    {
+        "messages": [...],
+        "count": 20
+    }
+    """
+    if not OAUTH_AVAILABLE:
+        return jsonify({'error': 'Gmail integration not available'}), 503
+    
+    try:
+        user_email = get_current_user()
+        
+        # Check if user has OAuth credentials
+        creds_dict = auth_manager.get_oauth_credentials(user_email, 'google')
+        
+        if not creds_dict:
+            return jsonify({
+                'error': 'Not authenticated with Gmail. Please connect your Google account first.',
+                'auth_required': True
+            }), 401
+        
+        # Convert dict back to Credentials object
+        credentials = dict_to_credentials(creds_dict)
+        
+        # Get request parameters
+        data = request.get_json() or {}
+        max_results = data.get('max_results', 20)
+        query = data.get('query', '')
+        
+        # Fetch messages
+        messages = fetch_gmail_messages(credentials, max_results, query)
+        
+        # Update stored credentials if they were refreshed
+        updated_creds = credentials_to_dict(credentials)
+        auth_manager.store_oauth_credentials(user_email, 'google', updated_creds)
+        
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'count': len(messages)
         })
     
     except Exception as e:

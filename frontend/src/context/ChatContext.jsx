@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { getAuthHeaders } from '../utils/auth';
 
 const ChatContext = createContext(null);
 
@@ -36,9 +37,7 @@ export function ChatProvider({ children }) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/conversations`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -75,9 +74,7 @@ export function ChatProvider({ children }) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/conversations/save`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...conversation,
           updatedAt: new Date().toISOString(),
@@ -174,9 +171,7 @@ export function ChatProvider({ children }) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/conversations/${chatId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

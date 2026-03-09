@@ -335,3 +335,74 @@ class AuthManager:
                 return conv
         
         return None
+    
+    def store_oauth_credentials(self, email, provider, credentials_dict):
+        """
+        Store OAuth credentials for a user
+        
+        Args:
+            email: User's email address
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            credentials_dict: Dictionary containing OAuth credentials
+        """
+        email = email.lower()
+        
+        # Initialize oauth_credentials file if not exists
+        oauth_file = self.data_dir / 'oauth_credentials.json'
+        oauth_db = self._load_json(oauth_file, {})
+        
+        if email not in oauth_db:
+            oauth_db[email] = {}
+        
+        oauth_db[email][provider] = {
+            **credentials_dict,
+            'stored_at': datetime.now().isoformat()
+        }
+        
+        self._save_json(oauth_file, oauth_db)
+        return True
+    
+    def get_oauth_credentials(self, email, provider):
+        """
+        Retrieve OAuth credentials for a user
+        
+        Args:
+            email: User's email address
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            
+        Returns:
+            dict: OAuth credentials or None if not found
+        """
+        email = email.lower()
+        
+        oauth_file = self.data_dir / 'oauth_credentials.json'
+        oauth_db = self._load_json(oauth_file, {})
+        
+        if email in oauth_db and provider in oauth_db[email]:
+            return oauth_db[email][provider]
+        
+        return None
+    
+    def delete_oauth_credentials(self, email, provider):
+        """
+        Delete OAuth credentials for a user
+        
+        Args:
+            email: User's email address
+            provider: OAuth provider (e.g., 'google', 'microsoft')
+            
+        Returns:
+            bool: True if deleted, False if not found
+        """
+        email = email.lower()
+        
+        oauth_file = self.data_dir / 'oauth_credentials.json'
+        oauth_db = self._load_json(oauth_file, {})
+        
+        if email in oauth_db and provider in oauth_db[email]:
+            del oauth_db[email][provider]
+            self._save_json(oauth_file, oauth_db)
+            return True
+        
+        return False
+
