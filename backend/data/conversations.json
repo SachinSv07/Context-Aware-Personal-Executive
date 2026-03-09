@@ -1,18 +1,24 @@
 {
   "user@example.com": [
     {
+      "createdAt": "2026-03-09T09:18:00.977Z",
       "id": "1",
-      "title": "when was my friend birthday",
       "messages": [
         {
+          "content": "when was my friend birthday",
           "id": 1773047935957,
           "role": "user",
-          "content": "when was my friend birthday",
           "timestamp": "02:48 pm"
+        },
+        {
+          "id": 1773049816437,
+          "role": "user",
+          "content": "when was the party",
+          "timestamp": "03:20 pm"
         }
       ],
-      "createdAt": "2026-03-09T09:18:00.977Z",
-      "updatedAt": "2026-03-09T09:18:55.958Z"
+      "title": "when was my friend birthday",
+      "updatedAt": "2026-03-09T09:50:16.437Z"
     }
   ]
 }

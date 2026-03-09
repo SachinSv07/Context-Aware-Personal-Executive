@@ -20,16 +20,39 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email'
 ]
 
-def get_client_config():
-    """Get OAuth client configuration from environment variables"""
+def get_client_config(auth_manager=None):
+    """
+    Get OAuth client configuration from stored config or environment variables
+    
+    Args:
+        auth_manager: AuthManager instance to retrieve stored config (optional)
+    
+    Returns:
+        dict: OAuth client configuration
+    """
+    # Try to get from stored configuration first
+    if auth_manager:
+        stored_config = auth_manager.get_oauth_app_config('google')
+        if stored_config and stored_config.get('client_id') and stored_config.get('client_secret'):
+            return {
+                "web": {
+                    "client_id": stored_config['client_id'],
+                    "client_secret": stored_config['client_secret'],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [stored_config.get('redirect_uri', 'http://localhost:5000/api/auth/google/callback')]
+                }
+            }
+    
+    # Fallback to environment variables
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback")
     
     if not client_id or not client_secret:
         raise ValueError(
-            "Missing Google OAuth credentials. Please set GOOGLE_CLIENT_ID and "
-            "GOOGLE_CLIENT_SECRET in your .env file. See OAUTH_SETUP.md for instructions."
+            "Missing Google OAuth credentials. Please configure via Dashboard OAuth setup or "
+            "set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env file."
         )
     
     return {
@@ -42,19 +65,22 @@ def get_client_config():
         }
     }
 
-def get_authorization_url(user_email):
+def get_authorization_url(user_email, auth_manager=None):
     """
     Generate OAuth authorization URL
     
     Args:
         user_email: Email of the user initiating OAuth
+        auth_manager: AuthManager instance (optional)
         
     Returns:
         tuple: (authorization_url, state)
     """
     try:
-        client_config = get_client_config()
-        redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback")
+        client_config = get_client_config(auth_manager)
+        
+        # Get redirect_uri from config or fallback to default
+        redirect_uri = client_config['web']['redirect_uris'][0]
         
         flow = Flow.from_client_config(
             client_config,
@@ -73,20 +99,23 @@ def get_authorization_url(user_email):
     except Exception as e:
         raise Exception(f"Failed to generate authorization URL: {str(e)}")
 
-def get_credentials_from_code(code, state):
+def get_credentials_from_code(code, state, auth_manager=None):
     """
     Exchange authorization code for credentials
     
     Args:
         code: Authorization code from OAuth callback
         state: State parameter (user_email) from OAuth callback
+        auth_manager: AuthManager instance (optional)
         
     Returns:
         Credentials: Google OAuth credentials object
     """
     try:
-        client_config = get_client_config()
-        redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5000/api/auth/google/callback")
+        client_config = get_client_config(auth_manager)
+        
+        # Get redirect_uri from config
+        redirect_uri = client_config['web']['redirect_uris'][0]
         
         flow = Flow.from_client_config(
             client_config,

@@ -595,7 +595,7 @@ def initiate_google_oauth():
         user_email = data.get('email') or get_current_user()
         
         # Generate authorization URL
-        authorization_url, state = get_authorization_url(user_email)
+        authorization_url, state = get_authorization_url(user_email, auth_manager)
         
         return jsonify({
             'authorization_url': authorization_url,
@@ -629,7 +629,7 @@ def google_oauth_callback():
             return redirect('http://localhost:3000/dashboard?oauth=error&message=Missing+authorization+code')
         
         # Exchange code for credentials
-        credentials = get_credentials_from_code(code, state)
+        credentials = get_credentials_from_code(code, state, auth_manager)
         
         # Convert credentials to dictionary for storage
         creds_dict = credentials_to_dict(credentials)
@@ -649,27 +649,76 @@ def google_oauth_callback():
 @app.route('/api/auth/google/status', methods=['GET'])
 def google_oauth_status():
     """
-    Check if user has connected Google OAuth
+    Check if user has connected Google OAuth and if OAuth is configured
     
     Response:
     {
         "connected": true,
-        "email": "user@gmail.com"
+        "oauth_configured": true,
+        "provider": "google"
     }
     """
     try:
         user_email = get_current_user()
+        
+        # Check if OAuth credentials are configured
+        oauth_configured = auth_manager.is_oauth_app_configured('google')
+        
+        # Check if user has connected their account
         credentials = auth_manager.get_oauth_credentials(user_email, 'google')
         
-        if credentials:
-            return jsonify({
-                'connected': True,
-                'provider': 'google'
-            })
-        else:
-            return jsonify({
-                'connected': False
-            })
+        return jsonify({
+            'connected': bool(credentials),
+            'oauth_configured': oauth_configured,
+            'provider': 'google'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/google/configure', methods=['POST'])
+def configure_google_oauth():
+    """
+    Save Google OAuth app credentials (Client ID and Secret)
+    
+    Request body:
+    {
+        "client_id": "your-client-id.apps.googleusercontent.com",
+        "client_secret": "your-client-secret",
+        "redirect_uri": "http://localhost:5000/api/auth/google/callback"
+    }
+    
+    Response:
+    {
+        "success": true,
+        "message": "OAuth credentials saved successfully"
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        client_id = data.get('client_id', '').strip()
+        client_secret = data.get('client_secret', '').strip()
+        redirect_uri = data.get('redirect_uri', 'http://localhost:5000/api/auth/google/callback').strip()
+        
+        if not client_id or not client_secret:
+            return jsonify({'error': 'Client ID and Client Secret are required'}), 400
+        
+        # Save OAuth app credentials
+        success = auth_manager.save_oauth_app_config('google', {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri
+        })
+        
+        if not success:
+            return jsonify({'error': 'Failed to save OAuth credentials'}), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'OAuth credentials saved successfully'
+        })
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
