@@ -1,0 +1,47 @@
+[
+    {
+        "id": 1,
+        "from": "john.doe@company.com",
+        "to": "you@company.com",
+        "subject": "Project Meeting Tomorrow",
+        "body": "Hi! Just a reminder about our project meeting tomorrow at 2 PM. We'll discuss the Q1 roadmap and budget allocation. Please bring your status reports.",
+        "date": "2026-03-08",
+        "labels": ["work", "meeting"]
+    },
+    {
+        "id": 2,
+        "from": "sarah.smith@startup.io",
+        "to": "you@company.com",
+        "subject": "Hackathon Update - Day 2",
+        "body": "Great progress today! The AI agent is working and we've integrated the email search. Tomorrow we focus on the PDF tool and frontend polish.",
+        "date": "2026-03-07",
+        "labels": ["hackathon", "development"]
+    },
+    {
+        "id": 3,
+        "from": "hr@company.com",
+        "to": "you@company.com",
+        "subject": "Annual Review Scheduled",
+        "body": "Your annual performance review has been scheduled for March 15, 2026 at 10:00 AM. Please prepare your self-assessment and achievement highlights.",
+        "date": "2026-03-05",
+        "labels": ["hr", "important"]
+    },
+    {
+        "id": 4,
+        "from": "tech-team@company.com",
+        "to": "dev-all@company.com",
+        "subject": "New Security Guidelines",
+        "body": "Please review the updated security guidelines in the shared drive. All API keys must now be stored in environment variables, not in code.",
+        "date": "2026-03-04",
+        "labels": ["security", "announcement"]
+    },
+    {
+        "id": 5,
+        "from": "client@external.com",
+        "to": "you@company.com",
+        "subject": "Re: Proposal Feedback",
+        "body": "Thank you for the detailed proposal. We're impressed with the AI integration approach. Can we schedule a call next week to discuss implementation timeline?",
+        "date": "2026-03-03",
+        "labels": ["client", "proposal"]
+    }
+]
