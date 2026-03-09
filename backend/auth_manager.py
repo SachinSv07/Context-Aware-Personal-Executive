@@ -22,12 +22,14 @@ class AuthManager:
         self.data_sources_file = self.data_dir / 'data_sources.json'
         self.files_file = self.data_dir / 'files.json'
         self.notes_file = self.data_dir / 'notes.json'
+        self.conversations_file = self.data_dir / 'conversations.json'
         
         # Load existing data or create empty databases
         self.users_db = self._load_json(self.users_file, {})
         self.data_sources_db = self._load_json(self.data_sources_file, {})
         self.files_db = self._load_json(self.files_file, {})
         self.notes_db = self._load_json(self.notes_file, {})
+        self.conversations_db = self._load_json(self.conversations_file, {})
     
     def _load_json(self, filepath, default=None):
         """Load JSON file or return default"""
@@ -274,3 +276,62 @@ class AuthManager:
         
         self.data_sources_db[email][source_name] = source_data
         self._save_json(self.data_sources_file, self.data_sources_db)
+    
+    def get_conversations(self, email):
+        """Retrieve all conversations for a user"""
+        email = email.lower()
+        return self.conversations_db.get(email, [])
+    
+    def save_conversation(self, email, conversation_data):
+        """Save or update a conversation"""
+        email = email.lower()
+        if email not in self.conversations_db:
+            self.conversations_db[email] = []
+        
+        # Check if conversation with this id already exists
+        conversation_id = conversation_data.get('id')
+        existing_conversations = self.conversations_db[email]
+        
+        for i, conv in enumerate(existing_conversations):
+            if conv.get('id') == conversation_id:
+                # Update existing conversation
+                existing_conversations[i] = conversation_data
+                self._save_json(self.conversations_file, self.conversations_db)
+                return conversation_data
+        
+        # Add new conversation
+        self.conversations_db[email].append(conversation_data)
+        self._save_json(self.conversations_file, self.conversations_db)
+        return conversation_data
+    
+    def delete_conversation(self, email, conversation_id):
+        """Delete a conversation from user's collection"""
+        email = email.lower()
+        if email not in self.conversations_db:
+            return None
+        
+        user_conversations = self.conversations_db[email]
+        for i, conv in enumerate(user_conversations):
+            if conv.get('id') == conversation_id:
+                deleted_conversation = user_conversations.pop(i)
+                self._save_json(self.conversations_file, self.conversations_db)
+                return deleted_conversation
+        
+        return None
+    
+    def add_message_to_conversation(self, email, conversation_id, message):
+        """Add a message to an existing conversation"""
+        email = email.lower()
+        if email not in self.conversations_db:
+            return None
+        
+        user_conversations = self.conversations_db[email]
+        for conv in user_conversations:
+            if conv.get('id') == conversation_id:
+                if 'messages' not in conv:
+                    conv['messages'] = []
+                conv['messages'].append(message)
+                self._save_json(self.conversations_file, self.conversations_db)
+                return conv
+        
+        return None

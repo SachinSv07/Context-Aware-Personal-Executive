@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import ChatPage from './pages/ChatPage';
@@ -15,6 +15,35 @@ function ProtectedRoute({ isAuthenticated, children }) {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check for existing authentication on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    if (token && user) {
+      setIsAuthenticated(true);
+    }
+    
+    setIsCheckingAuth(false);
+  }, []);
+
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setIsAuthenticated(false);
+  };
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--bg-main)]">
+        <div className="text-slate-300">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <ChatProvider>
@@ -40,7 +69,7 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <Settings />
+              <Settings onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />

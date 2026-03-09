@@ -1,0 +1,16 @@
+{
+  "nisha001711@gmail.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  }
+}
