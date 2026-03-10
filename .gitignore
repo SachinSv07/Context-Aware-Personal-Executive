@@ -61,3 +61,7 @@ htmlcov/
 # User data (if storing actual personal data)
 sample_data/*.pdf
 !sample_data/README_PDF.txt
+
+# OAuth credentials (sensitive data)
+backend/data/oauth_app_config.json
+backend/data/oauth_credentials.json
