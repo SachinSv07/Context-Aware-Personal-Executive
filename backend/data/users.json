@@ -6,5 +6,13 @@
     "avatar": "https://ui-avatars.com/api/?name=Nisha",
     "created_at": "2026-03-09T14:40:08.542920",
     "last_login": "2026-03-09T15:01:32.609803"
+  },
+  "jriswan207@gmail.com": {
+    "email": "jriswan207@gmail.com",
+    "name": "Riswan",
+    "password_hash": "scrypt:32768:8:1$RKVKzd5B06vMBL8q$cb61981d008658c70b8a7bfc232dd5e72f8aadf69b636047a922ec2aabf5fcff91bae30871b697f503995e8696da36501c357e0975bc2ec26dbe48e5242e151b",
+    "avatar": "https://ui-avatars.com/api/?name=Riswan",
+    "created_at": "2026-03-10T10:01:28.703631",
+    "last_login": "2026-03-10T10:01:50.115917"
   }
 }
