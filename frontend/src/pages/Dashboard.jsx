@@ -306,7 +306,6 @@ function ConnectCard({ title, description, onConnect, isConnected }) {
 }
 
 function Dashboard() {
-  const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -349,16 +348,41 @@ function Dashboard() {
     }
   };
 
-  const handleEmailFetch = async () => {
-    if (gmailConnected) {
-      // Already connected, fetch emails
-      await fetchGmailMessages();
-    } else if (!oauthConfigured) {
+  const handleGmailConnect = async () => {
+    if (!oauthConfigured) {
       // OAuth not configured, show setup modal
       setShowOAuthModal(true);
     } else {
       // OAuth configured but not connected, initiate OAuth
       await initiateGoogleOAuth();
+    }
+  };
+
+  const handleGmailDisconnect = async () => {
+    setGmailLoading(true);
+    setStatusMessage('Disconnecting Gmail...');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/google/disconnect', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Failed to disconnect Gmail');
+        setGmailLoading(false);
+        return;
+      }
+
+      setGmailConnected(false);
+      setStatusMessage('Success: Gmail disconnected');
+      setGmailLoading(false);
+    } catch (error) {
+      console.error('Gmail disconnect error:', error);
+      setStatusMessage('Failed to disconnect Gmail. Please try again.');
+      setGmailLoading(false);
     }
   };
 
@@ -370,7 +394,7 @@ function Dashboard() {
       const response = await fetch('http://localhost:5000/api/auth/google/initiate', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ email: email || undefined })
+        body: JSON.stringify({})
       });
 
       const data = await response.json();
@@ -391,41 +415,6 @@ function Dashboard() {
     } catch (error) {
       console.error('OAuth initiation error:', error);
       setStatusMessage('Failed to connect to server. Make sure backend is running.');
-      setGmailLoading(false);
-    }
-  };
-
-  const fetchGmailMessages = async () => {
-    setGmailLoading(true);
-    setStatusMessage('Fetching Gmail messages...');
-    
-    try {
-      const response = await fetch('http://localhost:5000/api/gmail/fetch', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ max_results: 20 })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.auth_required) {
-          // Need to authenticate first
-          await initiateGoogleOAuth();
-          return;
-        }
-        setStatusMessage(data.error || 'Failed to fetch emails');
-        setGmailLoading(false);
-        return;
-      }
-
-      setStatusMessage(`Successfully fetched ${data.count} emails!`);
-      console.log('Gmail messages:', data.messages);
-      setGmailLoading(false);
-
-    } catch (error) {
-      console.error('Gmail fetch error:', error);
-      setStatusMessage('Failed to fetch emails. Please try again.');
       setGmailLoading(false);
     }
   };
@@ -541,21 +530,17 @@ function Dashboard() {
             <div className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-500">
               💡 User authentication via Google OAuth 2.0. Click 'Connect Gmail' to authorize access to your inbox securely.
             </div>
-            {!gmailConnected && (
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none"
-                placeholder="Your email (optional)"
-              />
-            )}
             <button
               type="button"
-              onClick={handleEmailFetch}
+              onClick={gmailConnected ? handleGmailDisconnect : handleGmailConnect}
               disabled={gmailLoading}
-              className="mt-4 rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className={`mt-4 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                gmailConnected
+                  ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                  : 'bg-teal-400 text-slate-900 hover:brightness-110'
+              }`}
             >
-              {gmailLoading ? 'Connecting...' : gmailConnected ? 'Fetch Emails' : 'Connect Gmail'}
+              {gmailLoading ? (gmailConnected ? 'Disconnecting...' : 'Connecting...') : (gmailConnected ? 'Disconnect Gmail' : 'Connect Gmail')}
             </button>
           </div>
 

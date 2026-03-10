@@ -462,4 +462,64 @@ class AuthManager:
         # Check if required fields are present
         required_fields = ['client_id', 'client_secret']
         return all(field in config and config[field] for field in required_fields)
+    
+    def save_temp_data(self, key, value):
+        """
+        Save temporary data (e.g., OAuth code_verifier)
+        
+        Args:
+            key: Unique identifier for the data
+            value: Data to store
+            
+        Returns:
+            bool: True if saved successfully
+        """
+        temp_data_file = self.data_dir / 'temp_data.json'
+        temp_db = self._load_json(temp_data_file, {})
+        
+        temp_db[key] = {
+            'value': value,
+            'stored_at': datetime.now().isoformat()
+        }
+        
+        self._save_json(temp_data_file, temp_db)
+        return True
+    
+    def get_temp_data(self, key):
+        """
+        Retrieve temporary data
+        
+        Args:
+            key: Unique identifier for the data
+            
+        Returns:
+            The stored value or None if not found
+        """
+        temp_data_file = self.data_dir / 'temp_data.json'
+        temp_db = self._load_json(temp_data_file, {})
+        
+        if key in temp_db:
+            return temp_db[key]['value']
+        
+        return None
+    
+    def delete_temp_data(self, key):
+        """
+        Delete temporary data
+        
+        Args:
+            key: Unique identifier for the data
+            
+        Returns:
+            bool: True if deleted, False if not found
+        """
+        temp_data_file = self.data_dir / 'temp_data.json'
+        temp_db = self._load_json(temp_data_file, {})
+        
+        if key in temp_db:
+            del temp_db[key]
+            self._save_json(temp_data_file, temp_db)
+            return True
+        
+        return False
 

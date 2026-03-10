@@ -121,8 +121,9 @@ def query():
         if not user_query:
             return jsonify({'error': 'Query is required'}), 400
         
-        # Call your agent
-        response = process_query(user_query)
+        # Call agent with user context so tools can use user-scoped OAuth data
+        user_email = get_current_user()
+        response = process_query(user_query, user_email=user_email)
         
         return jsonify({'response': response})
     
@@ -673,6 +674,22 @@ def google_oauth_status():
             'provider': 'google'
         })
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/google/disconnect', methods=['POST'])
+def google_oauth_disconnect():
+    """Disconnect Gmail for current user by removing stored Google OAuth credentials."""
+    try:
+        user_email = get_current_user()
+        deleted = auth_manager.delete_oauth_credentials(user_email, 'google')
+
+        return jsonify({
+            'success': True,
+            'disconnected': bool(deleted),
+            'message': 'Gmail disconnected successfully' if deleted else 'Gmail was already disconnected'
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

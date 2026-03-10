@@ -95,6 +95,10 @@ def get_authorization_url(user_email, auth_manager=None):
             state=user_email  # Pass user_email as state for tracking
         )
         
+        # Store code_verifier for later use in token exchange
+        if auth_manager and hasattr(flow, 'code_verifier'):
+            auth_manager.save_temp_data(f'code_verifier_{user_email}', flow.code_verifier)
+        
         return authorization_url, state
     except Exception as e:
         raise Exception(f"Failed to generate authorization URL: {str(e)}")
@@ -124,6 +128,14 @@ def get_credentials_from_code(code, state, auth_manager=None):
             state=state
         )
         
+        # Restore code_verifier from storage (needed for PKCE)
+        if auth_manager:
+            stored_verifier = auth_manager.get_temp_data(f'code_verifier_{state}')
+            if stored_verifier:
+                flow.code_verifier = stored_verifier
+                # Clean up temporary storage
+                auth_manager.delete_temp_data(f'code_verifier_{state}')
+        
         flow.fetch_token(code=code)
         return flow.credentials
     except Exception as e:
@@ -137,18 +149,26 @@ def credentials_to_dict(credentials):
         'token_uri': credentials.token_uri,
         'client_id': credentials.client_id,
         'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
+        'scopes': credentials.scopes,
+        'expiry': credentials.expiry.isoformat() if credentials.expiry else None
     }
 
 def dict_to_credentials(creds_dict):
     """Convert stored dictionary back to Credentials object"""
+    from datetime import datetime
+    
+    expiry = None
+    if creds_dict.get('expiry'):
+        expiry = datetime.fromisoformat(creds_dict['expiry'])
+    
     return Credentials(
         token=creds_dict['token'],
         refresh_token=creds_dict.get('refresh_token'),
         token_uri=creds_dict['token_uri'],
         client_id=creds_dict['client_id'],
         client_secret=creds_dict['client_secret'],
-        scopes=creds_dict['scopes']
+        scopes=creds_dict['scopes'],
+        expiry=expiry
     )
 
 def build_gmail_service(credentials):

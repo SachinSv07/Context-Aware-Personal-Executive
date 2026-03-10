@@ -183,15 +183,20 @@ def choose_tool(query: str) -> ToolName:
         return _fallback_tool_choice(query)
 
 
-def _run_tool(tool: ToolName, query: str) -> Any:
+def _run_tool(tool: ToolName, query: str, user_email: str | None = None) -> Any:
     """Execute selected tool by importing only what is needed."""
     if tool == "email":
         from tools.gmail_tool import search_gmail
         from tools.email_tool import search_email
 
-        gmail_results = search_gmail(query)
+        gmail_results = search_gmail(query, user_email=user_email)
         if gmail_results:
             return gmail_results
+
+        # For authenticated users, avoid falling back to local sample email data.
+        # This keeps chat results strictly tied to their real Gmail account.
+        if user_email:
+            return []
 
         return search_email(query)
 
@@ -213,6 +218,10 @@ def _run_tool(tool: ToolName, query: str) -> Any:
     from tools.csv_tool import search_csv
 
     return search_csv(query)
+
+
+def _is_non_empty_result(result: Any) -> bool:
+    return isinstance(result, list) and len(result) > 0
 
 
 def _shorten(text: Any, limit: int = 140) -> str:
@@ -290,38 +299,28 @@ def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
 
         # EMAIL FORMAT
         if tool == "email":
-            lines.append(f"+--- RESULT {idx} " + "-" * 53 + "+")
-            
-            subject = _shorten(item.get('subject', 'N/A'), 60)
-            lines.append(f"| SUBJECT:  {subject:<58} |")
-            
-            sender = _shorten(item.get('from', 'N/A'), 58)
-            lines.append(f"| FROM:     {sender:<58} |")
-            
+            source_label = item.get("source") or "Gmail/Email"
+            lines.append(f"Result {idx}")
+            lines.append(f"source: {source_label}")
+            lines.append(f"subject: {_shorten(item.get('subject', 'N/A'), 180)}")
+            lines.append(f"from: {_shorten(item.get('from', 'N/A'), 180)}")
+            if item.get("to"):
+                lines.append(f"to: {_shorten(item.get('to', ''), 180)}")
             if item.get("date"):
-                date_str = _shorten(item.get('date'), 58)
-                lines.append(f"| DATE:     {date_str:<58} |")
-            
-            lines.append("|" + "-" * 68 + "|")
-            
-            # Show snippet or summary
-            if item.get("snippet"):
-                snippet = _shorten(item.get('snippet'), 65)
-                lines.append(f"| SUMMARY:")
-                lines.append(f"| {snippet:<65} |")
-            
-            # Show FULL content in paragraph format
-            content = item.get("content", "")
-            if content:
-                lines.append("|")
-                lines.append(f"| FULL CONTENT:")
-                lines.append("|")
-                # Wrap content as paragraphs
-                wrapped_lines = _wrap_paragraph(content, 64)
-                for wrapped_line in wrapped_lines:
-                    lines.append(f"| {wrapped_line:<64} |")
-            
-            lines.append("+" + "-" * 68 + "+\n")
+                lines.append(f"date: {_shorten(item.get('date'), 180)}")
+
+            summary_text = item.get("snippet") or ""
+            if summary_text:
+                lines.append(f"summary: {_shorten(summary_text, 260)}")
+
+            content_text = item.get("matched_content") or item.get("content") or ""
+            if content_text:
+                lines.append("content:")
+                wrapped_lines = _wrap_paragraph(content_text, 90)
+                for wrapped_line in wrapped_lines[:10]:
+                    lines.append(wrapped_line)
+
+            lines.append("-" * 70)
             continue
 
         # DRIVE FORMAT
@@ -460,7 +459,7 @@ def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
     return "\n".join(lines)
 
 
-def process_query(query: str) -> str:
+def process_query(query: str, user_email: str | None = None) -> str:
     """Main orchestrator entry point.
 
     Usage:
@@ -473,7 +472,24 @@ def process_query(query: str) -> str:
     tool = choose_tool(query)
 
     try:
-        result = _run_tool(tool, query)
+        result = _run_tool(tool, query, user_email=user_email)
+        if _is_non_empty_result(result):
+            return _format_structured_result(tool, query, result)
+
+        fallback_order: list[ToolName] = ["email", "pdf", "csv", "drive", "calendar"]
+        for candidate in fallback_order:
+            if candidate == tool:
+                continue
+            candidate_result = _run_tool(candidate, query, user_email=user_email)
+            if _is_non_empty_result(candidate_result):
+                return _format_structured_result(candidate, query, candidate_result)
+
+        # Final safety net: if nothing matched, try returning recent Gmail context
+        # so chat still provides a useful response instead of empty results.
+        recent_email_result = _run_tool("email", "", user_email=user_email)
+        if _is_non_empty_result(recent_email_result):
+            return _format_structured_result("email", query, recent_email_result)
+
         return _format_structured_result(tool, query, result)
     except Exception:
         return "No relevant information found."
