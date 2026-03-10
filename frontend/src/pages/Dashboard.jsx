@@ -151,13 +151,25 @@ function TextInputCard({ title, description, value, onChange, buttonText = 'Save
 
 // Card for file upload sources (PDF, Google Drive)
 function FileUploadCard({ title, description, onUpload }) {
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      onUpload(file);
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(files);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFiles.length || uploading) {
+      return;
+    }
+
+    setUploading(true);
+    try {
+      await onUpload(selectedFiles);
+      setSelectedFiles([]);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -182,23 +194,37 @@ function FileUploadCard({ title, description, onUpload }) {
             />
           </svg>
           <span className="mt-2 text-sm text-slate-400">
-            {selectedFile ? selectedFile.name : 'Click to upload'}
+            {selectedFiles.length
+              ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
+              : 'Click to upload'}
           </span>
           <input
             type="file"
             className="hidden"
             onChange={handleFileChange}
+            multiple
             accept={title === 'PDF Upload' ? '.pdf' : '*'}
           />
         </label>
       </div>
 
+      {selectedFiles.length > 0 && (
+        <div className="mt-3 max-h-28 space-y-1 overflow-y-auto rounded-lg bg-slate-900/60 p-2">
+          {selectedFiles.map((file) => (
+            <div key={`${file.name}-${file.size}-${file.lastModified}`} className="truncate text-xs text-slate-300">
+              {file.name}
+            </div>
+          ))}
+        </div>
+      )}
+
       <button
         type="button"
-        disabled={!selectedFile}
+        onClick={handleUpload}
+        disabled={!selectedFiles.length || uploading}
         className="mt-4 w-full rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Upload & Save
+        {uploading ? 'Uploading...' : 'Upload & Save'}
       </button>
     </div>
   );
@@ -306,8 +332,6 @@ function ConnectCard({ title, description, onConnect, isConnected }) {
 }
 
 function Dashboard({ onLogout }) {
-  const [notes, setNotes] = useState('');
-  const [calendarConnected, setCalendarConnected] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -419,14 +443,59 @@ function Dashboard({ onLogout }) {
     }
   };
 
-  const handleNotesSave = () => {
-    // TODO: Save notes to backend
-    console.log('Saving notes:', notes);
-  };
+  const handlePdfUpload = async (files) => {
+    if (!files?.length) {
+      setStatusMessage('Error: Please select at least one PDF file.');
+      return;
+    }
 
-  const handlePdfUpload = (file) => {
-    // TODO: Upload PDF to backend
-    console.log('Uploading PDF:', file);
+    const invalidFiles = files.filter((file) => !file.name.toLowerCase().endsWith('.pdf'));
+    if (invalidFiles.length > 0) {
+      setStatusMessage('Error: Only PDF files are allowed.');
+      return;
+    }
+
+    setStatusMessage(`Uploading ${files.length} PDF file${files.length > 1 ? 's' : ''}...`);
+
+    const token = localStorage.getItem('token');
+    const uploadHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('http://localhost:5000/api/files/upload', {
+          method: 'POST',
+          headers: uploadHeaders,
+          body: formData,
+        });
+
+        if (response.ok) {
+          successCount += 1;
+        } else {
+          failureCount += 1;
+        }
+      } catch (error) {
+        console.error('PDF upload error:', error);
+        failureCount += 1;
+      }
+    }
+
+    if (failureCount === 0) {
+      setStatusMessage(`Success: Uploaded ${successCount} PDF file${successCount > 1 ? 's' : ''}.`);
+      return;
+    }
+
+    if (successCount === 0) {
+      setStatusMessage('Error: Failed to upload PDF files. Please try again.');
+      return;
+    }
+
+    setStatusMessage(`Success: Uploaded ${successCount} file${successCount > 1 ? 's' : ''}. Failed: ${failureCount}.`);
   };
 
   const handleDriveFilesSelected = (files) => {
@@ -434,10 +503,20 @@ function Dashboard({ onLogout }) {
     console.log('Selected files from Google Drive:', files);
   };
 
-  const handleCalendarConnect = () => {
-    // TODO: Integrate with Google Calendar API
-    setCalendarConnected(!calendarConnected);
-    console.log('Calendar connection toggled');
+  const handleDriveConnect = async () => {
+    if (gmailConnected) {
+      await handleGmailDisconnect();
+      return;
+    }
+    await handleGmailConnect();
+  };
+
+  const handleCalendarConnect = async () => {
+    if (gmailConnected) {
+      await handleGmailDisconnect();
+      return;
+    }
+    await handleGmailConnect();
   };
 
   const saveOAuthCredentials = async ({ clientId, clientSecret }) => {
@@ -566,23 +645,20 @@ function Dashboard({ onLogout }) {
             onUpload={handlePdfUpload}
           />
 
-          <GoogleDriveCard onFilesSelected={handleDriveFilesSelected} />
+          <ConnectCard
+            title="Google Drive"
+            description="Connect Google Drive to search files, docs, sheets, and presentations."
+            onConnect={handleDriveConnect}
+            isConnected={gmailConnected}
+          />
 
           <ConnectCard
             title="Google Calendar"
             description="Sync your calendar events for scheduling and time management."
             onConnect={handleCalendarConnect}
-            isConnected={calendarConnected}
+            isConnected={gmailConnected}
           />
 
-          <TextInputCard
-            title="Notes Text"
-            description="Add raw notes to help your assistant understand your priorities."
-            value={notes}
-            onChange={setNotes}
-            buttonText="Save Notes"
-            onAction={handleNotesSave}
-          />
         </div>
       </div>
     </div>

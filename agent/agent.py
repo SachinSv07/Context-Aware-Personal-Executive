@@ -4,7 +4,8 @@ This module keeps the flow simple for hackathon speed:
 1) Receive user query
 2) Choose the best tool (email/pdf/csv) with LLM routing
 3) Execute the selected tool
-4) Return a readable response with decision trace
+4) Validate results with LLM before showing to user
+5) Return only relevant responses
 """
 
 from __future__ import annotations
@@ -73,114 +74,168 @@ def _fallback_tool_choice(query: str) -> ToolName:
     q = query.lower()
     if any(k in q for k in ["email", "mail", "inbox", "sender", "subject"]):
         return "email"
-    if any(k in q for k in ["drive", "google drive", "document", "docs", "spreadsheet", "sheet", "slides", "file"]):
-        return "drive"
     if any(k in q for k in ["calendar", "meeting", "event", "schedule", "appointment", "invite"]):
         return "calendar"
-    if any(k in q for k in ["pdf", "document", "report", "paper", "page"]):
+    if any(k in q for k in ["drive", "google drive", "slides"]):
+        return "drive"
+    if any(k in q for k in ["pdf", "problem statement", "problem", "question", "assignment", "report", "research", "paper", "chapter", "page", "section"]):
         return "pdf"
-    if any(k in q for k in ["csv", "table", "sheet", "row", "column", "note", "notes"]):
+    if any(k in q for k in ["csv", "data", "table", "row", "column", "record", "list", "database"]):
         return "csv"
     return "email"
 
 
 def choose_tool(query: str) -> ToolName:
-    """Choose which data source to search: email, drive, calendar, pdf, or csv.
+    """Choose primary tool using KEYWORD-BASED ROUTING ONLY (NO LLM).
 
-    Prompt format used:
-        A user asked: {query}
+    Single-source results: routes to the most specific tool based on query intent.
+    No fallback to other tools - returns results only from the detected source.
 
-        Which data source should be searched?
-
-        Options:
-        email
-        pdf
-        csv
-        drive
-        calendar
-
-        Return only the tool name.
+    Returns one of: email, pdf, csv, drive, calendar
     """
     if not query or not query.strip():
         return "email"
 
+    query_lower = query.lower()
+
+    # === CALENDAR KEYWORDS ===
+    # Dates, events, meetings, schedules, personal dates
+    if any(k in query_lower for k in [
+        "calendar", "meeting", "event", "schedule", "appointment", "invite",
+        "upcoming", "birthday", "anniversary", "holiday", "vacation", 
+        "conference", "deadline", "reminder", "today", "tomorrow", "week",
+        "month", "date", "time", "when is"
+    ]):
+        return "calendar"
+
+    # === DRIVE KEYWORDS ===
+    # Documents, spreadsheets, files, folders in Google Drive
+    if any(k in query_lower for k in [
+        "drive", "google drive", "file", "document", "docs", "sheet", 
+        "spreadsheet", "slides", "folder", "presentation", "google sheets"
+    ]):
+        return "drive"
+
+    # === PDF KEYWORDS ===
+    # Academic work, problem statements, reports, papers, formal documents
+    if any(k in query_lower for k in [
+        "pdf", "problem statement", "problem", "question", "assignment", 
+        "report", "research", "paper", "chapter", "page", "section",
+        "resume", "cv", "curriculum vitae", "application", "proposal",
+        "contract", "agreement", "manual", "guide", "handbook", "textbook",
+        "description", "healthcare", "solution", "answer", "topic", 
+        "statement", "definition", "explanation", "details", "content"
+    ]):
+        return "pdf"
+
+    # === CSV KEYWORDS ===
+    # Data tables, records, entries, lists, databases
+    if any(k in query_lower for k in [
+        "csv", "data", "table", "row", "column", "record", "list", 
+        "database", "table header", "field", "entry", "entries",
+        "spreadsheet data", "records"
+    ]):
+        return "csv"
+
+    # === EMAIL KEYWORDS (Default) ===
+    # Messages, emails, communications, conversations
+    if any(k in query_lower for k in [
+        "email", "mail", "inbox", "sender", "subject", "message", 
+        "conversation", "from", "to", "reply", "forward"
+    ]):
+        return "email"
+
+    # Default to email for ambiguous queries
+    return "email"
+
+
+def _validate_results_with_llm(query: str, results: list, tool: ToolName) -> bool:
+    """Use Gemini LLM to validate if search results are actually relevant to the query.
+    
+    Args:
+        query: User's original question
+        results: Search results from a tool
+        tool: Which tool produced these results
+        
+    Returns:
+        True if results are relevant, False otherwise
+    """
+    if not results or len(results) == 0:
+        return False
+    
     gemini_api_key = os.getenv("GEMINI_API_KEY")
-
-    prompt = (
-        f"A user asked: {query}\n\n"
-        "Which data source should be searched?\n\n"
-        "Options:\n"
-        "email\n"
-        "pdf\n"
-        "csv\n"
-        "drive\n"
-        "calendar\n\n"
-        "Return only the tool name."
-    )
-
-    # Preferred path: Gemini 2.0 Flash
-    if gemini_api_key:
-        try:
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                "gemini-2.0-flash:generateContent"
-                f"?key={gemini_api_key}"
-            )
-
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0},
-            }
-            req = url_request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-
-            with url_request.urlopen(req, timeout=20) as response:
-                body = json.loads(response.read().decode("utf-8"))
-                raw = (
-                    body.get("candidates", [{}])[0]
-                    .get("content", {})
-                    .get("parts", [{}])[0]
-                    .get("text", "")
-                )
-                if raw:
-                    return _normalize_tool(raw)
-                # If Gemini returns empty, fall back
-                return _fallback_tool_choice(query)
-        except (url_error.URLError, TimeoutError, KeyError, IndexError, ValueError, json.JSONDecodeError) as e:
-            # Silently fall back if API fails
-            return _fallback_tool_choice(query)
-
-    # Optional compatibility path: OpenAI if GEMINI_API_KEY is not set.
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return _fallback_tool_choice(query)
-
+    if not gemini_api_key:
+        # No Gemini API key - accept results without validation
+        return True
+    
     try:
-        openai_module = importlib.import_module("openai")
-        OpenAI = getattr(openai_module, "OpenAI")
-        client = OpenAI(api_key=api_key)
+        # Create a summary of results for validation
+        result_summary = []
+        for idx, result in enumerate(results[:3], 1):  # Check first 3 results
+            if isinstance(result, dict):
+                # Extract key information based on tool type
+                if tool == "email":
+                    summary = f"Email {idx}: {result.get('subject', 'N/A')} from {result.get('from', 'N/A')}"
+                elif tool == "pdf":
+                    summary = f"PDF {idx}: {result.get('source', 'N/A')} - {result.get('text', '')[:100]}"
+                elif tool == "drive":
+                    summary = f"Drive {idx}: {result.get('name', 'N/A')} ({result.get('mime_type', 'N/A')})"
+                elif tool == "calendar":
+                    summary = f"Calendar {idx}: {result.get('summary', 'N/A')} on {result.get('start', 'N/A')}"
+                elif tool == "csv":
+                    summary = f"CSV {idx}: Row {result.get('row_number', 'N/A')}"
+                else:
+                    summary = f"Result {idx}: {str(result)[:100]}"
+                result_summary.append(summary)
+        
+        results_text = "\n".join(result_summary)
+        
+        # Ask Gemini if results are relevant
+        prompt = f"""User asked: "{query}"
 
-        response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            temperature=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a routing assistant. Return only one word: email, drive, calendar, pdf, or csv.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+Search results found:
+{results_text}
+
+Question: Are these search results actually relevant to what the user asked?
+Answer ONLY with "YES" if the results answer the user's question, or "NO" if they are irrelevant or don't match the query.
+
+Your answer (YES or NO):"""
+        
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-2.0-flash-exp:generateContent"
+            f"?key={gemini_api_key}"
         )
-
-        raw = response.choices[0].message.content or ""
-        return _normalize_tool(raw)
-
-    except Exception:
-        return _fallback_tool_choice(query)
+        
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0},
+        }
+        
+        req = url_request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        
+        with url_request.urlopen(req, timeout=10) as response:
+            body = json.loads(response.read().decode("utf-8"))
+            llm_response = (
+                body.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+                .strip()
+                .upper()
+            )
+            
+            # Check if Gemini said YES (relevant) or NO (not relevant)
+            return "YES" in llm_response
+    
+    except Exception as e:
+        # If validation fails, accept results anyway (fallback)
+        return True
 
 
 def _run_tool(tool: ToolName, query: str, user_email: str | None = None) -> Any:
@@ -208,12 +263,12 @@ def _run_tool(tool: ToolName, query: str, user_email: str | None = None) -> Any:
     if tool == "drive":
         from tools.drive_tool import search_drive
 
-        return search_drive(query)
+        return search_drive(query, user_email=user_email)
 
     if tool == "calendar":
         from tools.calendar_tool import search_calendar
 
-        return search_calendar(query)
+        return search_calendar(query, user_email=user_email)
 
     from tools.csv_tool import search_csv
 
@@ -460,7 +515,14 @@ def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
 
 
 def process_query(query: str, user_email: str | None = None) -> str:
-    """Main orchestrator entry point.
+    """Main orchestrator entry point with smart multi-tool fallback and LLM validation.
+
+    Flow:
+    1. Choose primary tool based on keyword matching (no LLM)
+    2. Search primary tool first
+    3. Validate results with LLM - are they relevant to the query?
+    4. If relevant, return results; if not, try other tools
+    5. Only show "not found" if ALL tools were searched or no relevant results
 
     Usage:
         from agent.agent import process_query
@@ -469,27 +531,65 @@ def process_query(query: str, user_email: str | None = None) -> str:
     if not query or not query.strip():
         return "No relevant information found."
 
-    tool = choose_tool(query)
+    primary_tool = choose_tool(query)
 
     try:
-        result = _run_tool(tool, query, user_email=user_email)
+        # Step 1: Search primary tool first
+        result = _run_tool(primary_tool, query, user_email=user_email)
+        
         if _is_non_empty_result(result):
-            return _format_structured_result(tool, query, result)
-
-        fallback_order: list[ToolName] = ["email", "pdf", "csv", "drive", "calendar"]
-        for candidate in fallback_order:
-            if candidate == tool:
-                continue
-            candidate_result = _run_tool(candidate, query, user_email=user_email)
-            if _is_non_empty_result(candidate_result):
-                return _format_structured_result(candidate, query, candidate_result)
-
-        # Final safety net: if nothing matched, try returning recent Gmail context
-        # so chat still provides a useful response instead of empty results.
-        recent_email_result = _run_tool("email", "", user_email=user_email)
-        if _is_non_empty_result(recent_email_result):
-            return _format_structured_result("email", query, recent_email_result)
-
-        return _format_structured_result(tool, query, result)
-    except Exception:
-        return "No relevant information found."
+            # Validate with LLM - are these results actually relevant?
+            if _validate_results_with_llm(query, result, primary_tool):
+                # Results are relevant - return immediately
+                return _format_structured_result(primary_tool, query, result)
+            # Results not relevant - continue searching other tools
+        
+        # Step 2: Primary tool found nothing or results were irrelevant - try other tools
+        # Define search order for fallback (related tools first)
+        tool_fallback_order = {
+            "email": ["drive", "pdf", "csv", "calendar"],
+            "pdf": ["drive", "csv", "email"],
+            "csv": ["drive", "pdf", "email"],
+            "drive": ["pdf", "csv", "email"],
+            "calendar": ["email", "drive"],
+        }
+        
+        fallback_tools = tool_fallback_order.get(primary_tool, ["email", "pdf", "csv", "drive", "calendar"])
+        
+        # Try each fallback tool in order
+        for fallback_tool in fallback_tools:
+            if fallback_tool == primary_tool:
+                continue  # Skip primary tool (already searched)
+            
+            fallback_result = _run_tool(fallback_tool, query, user_email=user_email)
+            
+            if _is_non_empty_result(fallback_result):
+                # Validate with LLM before returning
+                if _validate_results_with_llm(query, fallback_result, fallback_tool):
+                    # Found relevant results in fallback tool - return immediately
+                    return _format_structured_result(fallback_tool, query, fallback_result)
+                # Results not relevant - continue to next tool
+        
+        # Step 3: Nothing relevant found in any tool - show comprehensive "not found" message
+        searched_tools = [primary_tool] + [t for t in fallback_tools if t != primary_tool]
+        tool_names = ", ".join([
+            {"email": "Gmail", "pdf": "PDFs", "csv": "CSV", "drive": "Google Drive", "calendar": "Calendar"}
+            .get(t, t) for t in searched_tools
+        ])
+        
+        return (
+            f"======================================================================\n"
+            f"SEARCH QUERY: {query}\n"
+            f"======================================================================\n\n"
+            f"Searched in: {tool_names}\n\n"
+            f"No relevant information found in any source.\n\n"
+            f"Your question might require:\n"
+            f"- Real-time data (stock prices, current news, weather)\n"
+            f"- Information not yet uploaded to your sources\n"
+            f"- Different keywords or phrasing\n\n"
+            f"Tip: Upload relevant files or connect more data sources for better results.\n"
+            f"======================================================================"
+        )
+    
+    except Exception as e:
+        return f"Error processing query: {str(e)}"

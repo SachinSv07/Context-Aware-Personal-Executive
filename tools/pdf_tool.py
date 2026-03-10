@@ -1,6 +1,5 @@
 """
-PDF search tool
-Developer 1: Implement PDF searching logic here
+PDF search tool - searches uploaded PDF files
 """
 
 from typing import List, Dict, Any
@@ -11,81 +10,156 @@ from utils.helpers import log_info, log_error, calculate_similarity
 
 def search_pdf(query: str) -> List[Dict[str, Any]]:
     """
-    Search through PDF documents
+    Search through uploaded PDF documents using keyword-based matching.
     
     Args:
         query: User's search query
     
     Returns:
-        List of matching PDF excerpts
-    
-    Developer 1 TODO:
-        1. Use PyPDF2 or pdfplumber to extract text from PDFs
-        2. Split text into chunks (paragraphs or pages)
-        3. Search for relevant chunks
-        4. Return matches with page numbers and context
-        5. Consider using embeddings for better semantic search (optional)
+        List of matching PDF excerpts with page numbers and context
     """
     log_info(f"Searching PDFs for: {query}")
     
+    if not query or not query.strip():
+        return []
+    
     try:
-        # Check if PDF file exists
-        if not Path(PDF_DATA_PATH).exists():
-            log_error(f"PDF file not found: {PDF_DATA_PATH}")
+        # Search in the uploads directory where user PDFs are stored
+        uploads_dir = Path(__file__).parent.parent / "uploads"
+        results = []
+        
+        if not uploads_dir.exists():
+            log_info(f"Uploads directory not found: {uploads_dir}")
             return []
         
-        # TODO: Install PyPDF2 or pdfplumber
-        # pip install PyPDF2
-        # or
-        # pip install pdfplumber
+        # Find all PDF files in uploads directory
+        pdf_files = list(uploads_dir.glob("**/*.pdf"))
         
-        # For now, using a mock implementation
-        # Developer 1: Replace this with actual PDF parsing
+        if not pdf_files:
+            log_info(f"No PDF files found in {uploads_dir}")
+            return []
         
-        # Example using PyPDF2 (uncomment when library is installed):
-        """
-        import PyPDF2
+        log_info(f"Found {len(pdf_files)} PDF file(s) to search")
         
-        results = []
-        with open(PDF_DATA_PATH, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            
-            for page_num, page in enumerate(pdf_reader.pages):
-                text = page.extract_text()
-                
-                # Search in page text
-                if query.lower() in text.lower():
-                    # Extract context around the match
-                    lines = text.split('\n')
-                    matching_lines = [line for line in lines if query.lower() in line.lower()]
-                    
-                    for line in matching_lines[:MAX_SEARCH_RESULTS]:
-                        results.append({
-                            'page': page_num + 1,
-                            'text': line.strip(),
-                            'source': 'PDF Document',
-                            'relevance_score': calculate_similarity(query, line)
-                        })
-        
-        results.sort(key=lambda x: x['relevance_score'], reverse=True)
-        return results[:MAX_SEARCH_RESULTS]
-        """
-        
-        # Mock data for testing without PDF library
-        mock_results = [
-            {
-                'page': 1,
-                'text': f'Mock PDF result containing "{query}"',
-                'source': 'documents.pdf',
-                'relevance_score': 0.8
-            }
+        # Extract keywords from query (remove common stop words)
+        stop_words = {'the', 'is', 'it', 'what', 'in', 'a', 'an', 'and', 'or', 'of', 'to', 'for', 'on', 'at'}
+        query_keywords = [
+            word.lower() for word in query.split() 
+            if word.lower() not in stop_words and len(word) > 1
         ]
         
-        log_info(f"Found {len(mock_results)} matching PDF excerpts (MOCK DATA)")
-        return mock_results
+        if not query_keywords:
+            # If all words were stop words, use original query
+            query_keywords = [query.lower()]
+        
+        log_info(f"Search keywords: {query_keywords}")
+        
+        # Try using pdfplumber for advanced extraction
+        try:
+            import pdfplumber
+            
+            for pdf_file in pdf_files:
+                try:
+                    with pdfplumber.open(pdf_file) as pdf:
+                        for page_num, page in enumerate(pdf.pages, 1):
+                            text = page.extract_text() or ""
+                            text_lower = text.lower()
+                            
+                            # Check if ANY keyword matches in this page
+                            matched_keywords = [kw for kw in query_keywords if kw in text_lower]
+                            
+                            if matched_keywords:
+                                # Split into lines and find lines with matches
+                                lines = text.split('\n')
+                                for line_idx, line in enumerate(lines):
+                                    line_lower = line.lower()
+                                    
+                                    # Count how many keywords this line contains
+                                    line_matches = [kw for kw in query_keywords if kw in line_lower]
+                                    
+                                    if line_matches:
+                                        # Get context lines around the match
+                                        context_start = max(0, line_idx - 2)
+                                        context_end = min(len(lines), line_idx + 3)
+                                        context_lines = lines[context_start:context_end]
+                                        context = '\n'.join(context_lines)
+                                        
+                                        # Calculate relevance: more keywords matched = higher score
+                                        relevance = len(line_matches) / len(query_keywords)
+                                        
+                                        results.append({
+                                            'page': page_num,
+                                            'text': context.strip(),
+                                            'source': pdf_file.name,
+                                            'relevance_score': relevance,
+                                            'matched_keywords': line_matches
+                                        })
+                except Exception as e:
+                    log_error(f"Error reading PDF file {pdf_file.name}: {str(e)}")
+                    continue
+        
+        except ImportError:
+            # Fallback: try PyPDF2
+            try:
+                import PyPDF2
+                
+                for pdf_file in pdf_files:
+                    try:
+                        with open(pdf_file, 'rb') as f:
+                            pdf_reader = PyPDF2.PdfReader(f)
+                            
+                            for page_num, page in enumerate(pdf_reader.pages, 1):
+                                text = page.extract_text() or ""
+                                text_lower = text.lower()
+                                
+                                matched_keywords = [kw for kw in query_keywords if kw in text_lower]
+                                
+                                if matched_keywords:
+                                    lines = text.split('\n')
+                                    for line_idx, line in enumerate(lines):
+                                        line_lower = line.lower()
+                                        line_matches = [kw for kw in query_keywords if kw in line_lower]
+                                        
+                                        if line_matches:
+                                            context_start = max(0, line_idx - 2)
+                                            context_end = min(len(lines), line_idx + 3)
+                                            context = '\n'.join(lines[context_start:context_end])
+                                            
+                                            relevance = len(line_matches) / len(query_keywords)
+                                            
+                                            results.append({
+                                                'page': page_num,
+                                                'text': context.strip(),
+                                                'source': pdf_file.name,
+                                                'relevance_score': relevance,
+                                                'matched_keywords': line_matches
+                                            })
+                    except Exception as e:
+                        log_error(f"Error reading PDF file {pdf_file.name}: {str(e)}")
+                        continue
+            
+            except ImportError:
+                log_error("Neither pdfplumber nor PyPDF2 is installed. Cannot extract PDF text.")
+                return []
+        
+        # Remove duplicates based on page + similar text content
+        seen = set()
+        unique_results = []
+        for result in results:
+            key = (result['source'], result['page'], result['text'][:100])
+            if key not in seen:
+                seen.add(key)
+                unique_results.append(result)
+        
+        # Sort by relevance and limit results
+        unique_results.sort(key=lambda x: x['relevance_score'], reverse=True)
+        unique_results = unique_results[:MAX_SEARCH_RESULTS]
+        
+        log_info(f"Found {len(unique_results)} matching PDF results")
+        return unique_results
     
     except Exception as e:
-        log_error(f"Error searching PDFs", e)
+        log_error(f"Error searching PDFs: {str(e)}")
         return []
 
 

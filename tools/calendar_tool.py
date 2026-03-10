@@ -1,5 +1,6 @@
 """Google Calendar search tool using the Google Calendar API."""
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Any
@@ -8,7 +9,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from config import MAX_SEARCH_RESULTS, CALENDAR_TOKEN_PATH
+from config import MAX_SEARCH_RESULTS, GMAIL_TOKEN_PATH
 from utils.helpers import log_info, log_error, calculate_similarity
 
 
@@ -19,8 +20,54 @@ CALENDAR_SCOPES = [
 ]
 
 
-def _load_calendar_credentials() -> Credentials | None:
-    token_path = Path(CALENDAR_TOKEN_PATH)
+def _load_oauth_credentials_from_user(email: str) -> Credentials | None:
+    """Load OAuth credentials for a specific user from the stored credentials file."""
+    project_root = Path(__file__).resolve().parent.parent
+    oauth_file = project_root / "backend" / "data" / "oauth_credentials.json"
+    if not oauth_file.exists():
+        return None
+
+    try:
+        oauth_db = json.loads(oauth_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log_error("Failed to parse oauth_credentials.json", exc)
+        return None
+
+    provider_data = oauth_db.get((email or "").lower(), {}).get("google")
+    if not provider_data:
+        return None
+
+    try:
+        creds = Credentials(
+            token=provider_data.get("token"),
+            refresh_token=provider_data.get("refresh_token"),
+            token_uri=provider_data.get("token_uri", "https://oauth2.googleapis.com/token"),
+            client_id=provider_data.get("client_id"),
+            client_secret=provider_data.get("client_secret"),
+            scopes=provider_data.get("scopes") or CALENDAR_SCOPES,
+        )
+    except Exception as exc:
+        log_error("Failed to build user OAuth credentials", exc)
+        return None
+
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception as exc:
+            log_error("Failed to refresh Calendar credentials", exc)
+            return None
+
+    return creds
+
+
+def _load_calendar_credentials(user_email: str | None = None) -> Credentials | None:
+    """Load Google Calendar credentials from user OAuth or fallback token file."""
+    if user_email:
+        creds = _load_oauth_credentials_from_user(user_email)
+        if creds:
+            return creds
+
+    token_path = Path(GMAIL_TOKEN_PATH)
     if not token_path.exists():
         return None
 
@@ -41,12 +88,13 @@ def _load_calendar_credentials() -> Credentials | None:
     return creds
 
 
-def search_calendar(query: str) -> List[Dict[str, Any]]:
+def search_calendar(query: str, user_email: str | None = None) -> List[Dict[str, Any]]:
     """
     Search through Google Calendar events via the Calendar API.
 
     Args:
         query: User's search query (event title, attendees, description keywords, etc.)
+    user_email: Email of the authenticated user (optional)
 
     Returns:
         List of matching calendar event records
@@ -56,9 +104,9 @@ def search_calendar(query: str) -> List[Dict[str, Any]]:
     log_info(f"Searching Google Calendar for: {query}")
 
     try:
-        creds = _load_calendar_credentials()
+        creds = _load_calendar_credentials(user_email)
         if not creds:
-            log_error(f"Calendar token not found or invalid: {CALENDAR_TOKEN_PATH}")
+            log_info("No Google Calendar OAuth credentials found for search")
             return []
 
         service = build("calendar", "v3", credentials=creds)

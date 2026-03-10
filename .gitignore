@@ -65,3 +65,17 @@ sample_data/*.pdf
 # OAuth credentials (sensitive data)
 backend/data/oauth_app_config.json
 backend/data/oauth_credentials.json
+
+# User uploaded files (sensitive/personal data)
+uploads/
+backend/data/conversations.json
+backend/data/files.json
+backend/data/users.json
+backend/data/notes.json
+backend/data/data_sources.json
+
+# Gmail/Drive/Calendar tokens (sensitive)
+*_token.json
+*.json.token
+sample_data/*_token.json
+backend/data/*_token.json
