@@ -305,7 +305,7 @@ function ConnectCard({ title, description, onConnect, isConnected }) {
   );
 }
 
-function Dashboard() {
+function Dashboard({ onLogout }) {
   const [notes, setNotes] = useState('');
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -475,6 +475,13 @@ function Dashboard() {
     }
   };
 
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+    }
+    navigate('/');
+  };
+
   return (
     <>
       <OAuthSetupModal 
@@ -491,13 +498,22 @@ function Dashboard() {
             <h1 className="mt-2 text-2xl sm:text-3xl font-semibold text-white">Add your data sources</h1>
             <p className="mt-2 text-sm text-slate-400">All inputs are optional. Add only what you need before starting chat.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/chat')}
-            className="rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:brightness-110 w-full sm:w-auto flex-shrink-0"
-          >
-            Continue to Chat
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => navigate('/chat')}
+              className="rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:brightness-110 w-full sm:w-auto"
+            >
+              Continue to Chat
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-red-400 hover:text-red-300 w-full sm:w-auto"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Status Message */}

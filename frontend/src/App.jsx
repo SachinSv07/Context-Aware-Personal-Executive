@@ -53,7 +53,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <Dashboard />
+              <Dashboard onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />
@@ -61,7 +61,7 @@ function App() {
           path="/chat"
           element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <ChatPage />
+              <ChatPage onLogout={handleLogout} />
             </ProtectedRoute>
           }
         />

@@ -3,6 +3,7 @@
 import base64
 import json
 import re
+from email.utils import parsedate_to_datetime
 from html import unescape
 from pathlib import Path
 from typing import List, Dict, Any
@@ -101,7 +102,8 @@ def _extract_query_focused_content(content: str, query: str, snippet: str) -> st
 
 
 def _load_oauth_credentials_from_user(email: str) -> Credentials | None:
-    oauth_file = Path("backend/data/oauth_credentials.json")
+    project_root = Path(__file__).resolve().parent.parent
+    oauth_file = project_root / "backend" / "data" / "oauth_credentials.json"
     if not oauth_file.exists():
         return None
 
@@ -193,9 +195,20 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
             return []
 
         service = build("gmail", "v1", credentials=creds)
+        
+        # Check if query asks for recent/latest emails
+        query_lower = (query or "").lower()
+        temporal_keywords = ["latest", "recent", "new", "newest", "last", "today", "yesterday", "this week"]
+        wants_recent = any(keyword in query_lower for keyword in temporal_keywords)
+        
+        # Add date filter for recent queries
+        gmail_query = query
+        if wants_recent:
+            gmail_query = f"{query} newer_than:60d"
+        
         response = service.users().messages().list(
             userId="me",
-            q=query,
+            q=gmail_query,
             maxResults=max(MAX_SEARCH_RESULTS * 3, 10),
         ).execute()
 
@@ -209,7 +222,6 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
             messages = response.get("messages", [])
 
         results: List[Dict[str, Any]] = []
-        query_lower = (query or "").lower()
 
         for msg in messages:
             detail = service.users().messages().get(
@@ -227,9 +239,18 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
             subject = headers.get("Subject", "")
             sender = headers.get("From", "")
             recipient = headers.get("To", "")
+            date_str = headers.get("Date", "")
             snippet = detail.get("snippet", "")
             content = _extract_payload_text(detail.get("payload", {}))
             matched_content = _extract_query_focused_content(content, query, snippet)
+
+            # Parse date for sorting
+            date_parsed = None
+            try:
+                if date_str:
+                    date_parsed = parsedate_to_datetime(date_str)
+            except Exception:
+                pass
 
             score = 0.0
             if query_lower in subject.lower():
@@ -246,7 +267,8 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
                     "subject": subject,
                     "from": sender,
                     "to": recipient,
-                    "date": headers.get("Date", ""),
+                    "date": date_str,
+                    "date_parsed": date_parsed,
                     "snippet": snippet,
                     "content": content[:2000],
                     "matched_content": matched_content,
@@ -255,7 +277,12 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
                 }
             )
 
-        results.sort(key=lambda x: x.get("relevance_score", 0.0), reverse=True)
+        # Sort by date if query wants recent emails, otherwise by relevance
+        if wants_recent:
+            results.sort(key=lambda x: x.get("date_parsed") or parsedate_to_datetime("Thu, 01 Jan 1970 00:00:00 +0000"), reverse=True)
+        else:
+            results.sort(key=lambda x: x.get("relevance_score", 0.0), reverse=True)
+        
         top_results = results[:MAX_SEARCH_RESULTS]
         log_info(f"Found {len(top_results)} Gmail matches")
         return top_results
