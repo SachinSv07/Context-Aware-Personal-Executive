@@ -11,10 +11,19 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging as _logging
 import os
 from urllib import error as url_error
 from urllib import request as url_request
 from typing import Any, Literal
+
+try:
+    from google import genai as _genai
+    _GENAI_AVAILABLE = True
+except ImportError:
+    _GENAI_AVAILABLE = False
+
+_synth_log = _logging.getLogger(__name__)
 
 ToolName = Literal["email", "pdf", "csv", "drive", "calendar"]
 
@@ -459,6 +468,119 @@ def _format_structured_result(tool: ToolName, query: str, result: Any) -> str:
     return "\n".join(lines)
 
 
+def _truncate_results_for_prompt(result: Any, max_chars: int = 8000) -> str:
+    """Serialise results to JSON and trim to stay within Gemini's input limits."""
+    try:
+        raw = json.dumps(result, default=str, indent=2)
+    except Exception:
+        raw = str(result)
+    if len(raw) > max_chars:
+        raw = raw[:max_chars] + "\n... (truncated for brevity)"
+    return raw
+
+
+def _synthesize_response(tool: ToolName, query: str, result: Any) -> str:
+    """Pass raw tool results through Gemini to produce a clean natural-language answer.
+
+    Falls back to _format_structured_result if Gemini is unavailable or fails.
+    """
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_api_key:
+        _synth_log.warning("[SYNTHESIZE] GEMINI_API_KEY not found — using structured fallback")
+        return _format_structured_result(tool, query, result)
+
+    source_map = {
+        "email": "Gmail/Email",
+        "drive": "Google Drive",
+        "calendar": "Google Calendar",
+        "pdf": "PDF",
+        "csv": "CSV/Notes",
+    }
+
+    raw_data = _truncate_results_for_prompt(result)
+    source_label = source_map.get(tool, tool)
+    num_results = len(result) if isinstance(result, list) else 1
+
+    prompt = (
+        "You are a helpful personal executive assistant. "
+        "Respond using clean Markdown so the output renders beautifully in a chat UI.\n\n"
+        f'The user asked: "{query}"\n\n'
+        f"I searched their {source_label} and retrieved {num_results} result(s):\n\n"
+        f"{raw_data}\n\n"
+        "Format your response exactly like this:\n"
+        "- Start with one sentence summarising what you found.\n\n"
+        "- Then for EACH result use this structure:\n"
+        "  ### [Subject / Title]\n"
+        "  - **From:** sender name / email\n"
+        "  - **Date:** date and time\n"
+        "  - **Summary:** 2-3 sentences describing the key content, action items, or decisions\n"
+        "  - **Action / Deadline:** any deadlines, links, or next steps (omit if none)\n\n"
+        "- End with a `---` divider and a short **Takeaway:** sentence.\n\n"
+        "Rules:\n"
+        "- Use Markdown only (##, ###, **, -, etc.) — no raw JSON, no ASCII boxes, no code blocks\n"
+        "- Be detailed but concise — include all facts the user would care about\n"
+        "- Warm, professional assistant tone\n"
+        "- If no relevant results exist, apologise briefly and suggest what the user could try\n"
+    )
+
+    _synth_log.info("[SYNTHESIZE] Calling Gemini to synthesize %s result(s) for query: %s",
+                    num_results, query)
+
+    # Preferred path: use google-genai SDK (avoids urllib 403 on large payloads)
+    if _GENAI_AVAILABLE:
+        try:
+            client = _genai.Client(api_key=gemini_api_key)
+            response = client.models.generate_content(
+                model="gemini-flash-latest",
+                contents=prompt,
+                config={"temperature": 0.3},
+            )
+            synthesized = response.text or ""
+            if synthesized:
+                _synth_log.info("[SYNTHESIZE] Gemini SDK synthesis successful")
+                return synthesized.strip()
+            _synth_log.warning("[SYNTHESIZE] Gemini SDK returned empty text — using structured fallback")
+        except Exception as exc:
+            _synth_log.error("[SYNTHESIZE] Gemini SDK call failed (%s: %s) — using structured fallback",
+                             type(exc).__name__, exc)
+        return _format_structured_result(tool, query, result)
+
+    # urllib fallback (only if SDK not installed)
+    try:
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-flash-latest:generateContent"
+            f"?key={gemini_api_key}"
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.3},
+        }
+        req = url_request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with url_request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            synthesized = (
+                body.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
+            if synthesized:
+                _synth_log.info("[SYNTHESIZE] Gemini urllib synthesis successful")
+                return synthesized.strip()
+            _synth_log.warning("[SYNTHESIZE] Gemini returned empty text — using structured fallback")
+    except Exception as exc:
+        _synth_log.error("[SYNTHESIZE] Gemini urllib call failed (%s: %s) — using structured fallback",
+                         type(exc).__name__, exc)
+
+    return _format_structured_result(tool, query, result)
+
+
 def process_query(query: str, user_email: str | None = None) -> str:
     """Main orchestrator entry point.
 
@@ -474,7 +596,7 @@ def process_query(query: str, user_email: str | None = None) -> str:
     try:
         result = _run_tool(tool, query, user_email=user_email)
         if _is_non_empty_result(result):
-            return _format_structured_result(tool, query, result)
+            return _synthesize_response(tool, query, result)
 
         fallback_order: list[ToolName] = ["email", "pdf", "csv", "drive", "calendar"]
         for candidate in fallback_order:
@@ -482,14 +604,14 @@ def process_query(query: str, user_email: str | None = None) -> str:
                 continue
             candidate_result = _run_tool(candidate, query, user_email=user_email)
             if _is_non_empty_result(candidate_result):
-                return _format_structured_result(candidate, query, candidate_result)
+                return _synthesize_response(candidate, query, candidate_result)
 
         # Final safety net: if nothing matched, try returning recent Gmail context
         # so chat still provides a useful response instead of empty results.
         recent_email_result = _run_tool("email", "", user_email=user_email)
         if _is_non_empty_result(recent_email_result):
-            return _format_structured_result("email", query, recent_email_result)
+            return _synthesize_response("email", query, recent_email_result)
 
-        return _format_structured_result(tool, query, result)
+        return "I couldn't find any relevant information for your query. Please try rephrasing or check that your data sources are connected."
     except Exception:
         return "No relevant information found."
