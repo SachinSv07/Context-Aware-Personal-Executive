@@ -127,12 +127,12 @@ def choose_tool(query: str) -> ToolName:
         "Return only the tool name."
     )
 
-    # Preferred path: Gemini 2.0 Flash
+    # Preferred path: Gemini Flash Latest
     if gemini_api_key:
         try:
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/models/"
-                "gemini-2.0-flash:generateContent"
+                "gemini-flash-latest:generateContent"
                 f"?key={gemini_api_key}"
             )
 
@@ -503,24 +503,27 @@ def _synthesize_response(tool: ToolName, query: str, result: Any) -> str:
 
     prompt = (
         "You are a helpful personal executive assistant. "
-        "Respond using clean Markdown so the output renders beautifully in a chat UI.\n\n"
+        "Your response will be rendered as Markdown in a chat UI — use proper Markdown formatting.\n\n"
         f'The user asked: "{query}"\n\n'
-        f"I searched their {source_label} and retrieved {num_results} result(s):\n\n"
+        f"I searched their {source_label} and found {num_results} result(s):\n\n"
         f"{raw_data}\n\n"
-        "Format your response exactly like this:\n"
-        "- Start with one sentence summarising what you found.\n\n"
-        "- Then for EACH result use this structure:\n"
-        "  ### [Subject / Title]\n"
-        "  - **From:** sender name / email\n"
-        "  - **Date:** date and time\n"
-        "  - **Summary:** 2-3 sentences describing the key content, action items, or decisions\n"
-        "  - **Action / Deadline:** any deadlines, links, or next steps (omit if none)\n\n"
-        "- End with a `---` divider and a short **Takeaway:** sentence.\n\n"
-        "Rules:\n"
-        "- Use Markdown only (##, ###, **, -, etc.) — no raw JSON, no ASCII boxes, no code blocks\n"
-        "- Be detailed but concise — include all facts the user would care about\n"
-        "- Warm, professional assistant tone\n"
-        "- If no relevant results exist, apologise briefly and suggest what the user could try\n"
+        "Respond in EXACTLY this structure — no deviations:\n\n"
+        "Opening line: one plain sentence like 'I found X [source] results about [topic].'\n\n"
+        "For EACH result, output:\n"
+        "### <subject or title here>\n"
+        "- **From:** <sender name and email>\n"
+        "- **Date:** <date and time>\n"
+        "- **Summary:** <2-3 sentences covering the key content, decisions, or context>\n"
+        "- **Action / Deadline:** <next steps or deadlines — omit this line entirely if none>\n\n"
+        "After all results, output a divider and takeaway:\n"
+        "---\n"
+        "**Takeaway:** <one sentence overall insight or recommended next action>\n\n"
+        "STRICT RULES:\n"
+        "- Never output raw JSON, code blocks, or ASCII art\n"
+        "- Never skip the ### heading for each result\n"
+        "- Use **bold** for all field labels (From, Date, Summary, etc.)\n"
+        "- Keep tone warm and professional\n"
+        "- If zero results found, write a polite apology and suggest a rephrased search\n"
     )
 
     _synth_log.info("[SYNTHESIZE] Calling Gemini to synthesize %s result(s) for query: %s",
