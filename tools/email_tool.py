@@ -66,7 +66,8 @@ def search_email(query: str) -> List[Dict[str, Any]]:
             if score > 0:
                 results.append({
                     **email,
-                    'relevance_score': score
+                    'relevance_score': score,
+                    'source': 'Sample Email Data'
                 })
         
         # Sort by relevance and return top results
@@ -79,6 +80,46 @@ def search_email(query: str) -> List[Dict[str, Any]]:
     except Exception as e:
         log_error(f"Error searching emails", e)
         return []
+
+
+class EmailTool:
+    """
+    Class-based email search tool.
+    Searches email bodies for a given query string.
+    """
+
+    def run(self, query: str):
+        """
+        Search through emails for a query match in the body.
+
+        Args:
+            query: The keyword or phrase to search for.
+
+        Returns:
+            List of matching email bodies, or a 'not found' message.
+        """
+        results = []
+
+        try:
+            with open("sample_data/emails.json", "r", encoding="utf-8") as file:
+                emails = json.load(file)
+
+            print("Searching for:", query)
+            for email in emails:
+                content = email.get("body", "")
+                print("Checking:", content)
+                if query.lower() in content.lower():
+                    results.append(content)
+
+        except FileNotFoundError:
+            return "Email data file not found"
+        except Exception as e:
+            return f"Error reading emails: {e}"
+
+        if not results:
+            return "No relevant email found"
+
+        return results
 
 
 # Tool specification for OpenAI function calling
@@ -102,9 +143,19 @@ EMAIL_TOOL_SPEC = {
 
 
 if __name__ == "__main__":
-    # Test the email search tool
+    # Test the function-based search
     test_query = "meeting"
     results = search_email(test_query)
     print(f"Search results for '{test_query}':")
     for idx, result in enumerate(results, 1):
         print(f"{idx}. {result.get('subject')} (Score: {result.get('relevance_score', 0):.2f})")
+
+    # Test the class-based EmailTool
+    print("\n--- EmailTool class ---")
+    tool = EmailTool()
+    class_results = tool.run(test_query)
+    if isinstance(class_results, list):
+        for idx, body in enumerate(class_results, 1):
+            print(f"{idx}. {body[:80]}...")
+    else:
+        print(class_results)

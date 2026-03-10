@@ -1,0 +1,88 @@
+{
+  "user@example.com": [
+    {
+      "createdAt": "2026-03-09T09:18:00.977Z",
+      "id": "1",
+      "messages": [
+        {
+          "content": "when was my friend birthday",
+          "id": 1773047935957,
+          "role": "user",
+          "timestamp": "02:48 pm"
+        },
+        {
+          "id": 1773049816437,
+          "role": "user",
+          "content": "when was the party",
+          "timestamp": "03:20 pm"
+        }
+      ],
+      "title": "when was my friend birthday",
+      "updatedAt": "2026-03-09T09:50:16.437Z"
+    }
+  ],
+  "jriswan207@gmail.com": [
+    {
+      "id": "1",
+      "title": "chatgpt",
+      "messages": [
+        {
+          "id": 1773117155027,
+          "role": "user",
+          "content": "chatgpt",
+          "timestamp": "10:02 AM"
+        },
+        {
+          "id": 1773117155884,
+          "role": "assistant",
+          "content": "No relevant information found.",
+          "timestamp": "10:02 AM"
+        },
+        {
+          "id": 1773117380054,
+          "role": "user",
+          "content": "chatgpt",
+          "timestamp": "10:06 AM"
+        },
+        {
+          "id": 1773117380898,
+          "role": "assistant",
+          "content": "======================================================================\nSOURCE: Gmail/Email\nQUERY: chatgpt\n======================================================================\n\nMatches: 0\n\nNo relevant information found.",
+          "timestamp": "10:06 AM"
+        },
+        {
+          "id": 1773117618533,
+          "role": "user",
+          "content": "chatgpt",
+          "timestamp": "10:10 AM"
+        },
+        {
+          "id": 1773117625269,
+          "role": "assistant",
+          "content": "======================================================================\nSOURCE: Gmail/Email\nQUERY: chatgpt\n======================================================================\n\nMatches: 5 found\n\nResult 1\nsource: Gmail\nsubject: You + ChatGPT Images\nfrom: ChatGPT <noreply@email.openai.com>\nto: jriswan207@gmail.com\ndate: Thu, 05 Feb 2026 11:16:29 +0000 (UTC)\nsummary: Put yourself in any picture ChatGPT Logo Bring ideas to life with just a few words Create in any style \u2014 anime, photorealistic, pop art \u2014 with our most advanced image model. Start creating A woman in\ncontent:\nStart creating Show me with bangs before I make a decision I regret Put me in an 80's\nyearbook Remove all the people in the background Put a mini me in my hand A new home for\nimages Add a style to a photo you already have or create something totally new with just a\nfew words \u2014 all in ChatGPT Images. Try ChatGPT Images OpenAI 14\ufeff55 3\ufeffrd S\ufefft Sa\ufeffn\nFranc\ufeffisco C\ufeffA 941\ufeff58 Unsubscribe Privacy OpenAI \u00a9 2015-2025\n----------------------------------------------------------------------\nResult 2\nsource: Gmail\nsubject: Free ChatGPT Go for 12 months\nfrom: ChatGPT <noreply@email.openai.com>\nto: jriswan207@gmail.com\ndate: Sun, 18 Jan 2026 11:05:23 +0000 (UTC)\nsummary: Upgrade now for advanced access to AI tools ChatGPT Business Logo Try ChatGPT Go free for 12 months Unlock popular features like extended file uploads, image creation, and longer memory \u2014 all free for\ncontent:\nOpenAI Newsletter 96 Upgrade now for advanced access to AI tools Try ChatGPT Go free for\n12 months Unlock popular features like extended file uploads, image creation, and longer\nmemory \u2014 all free for one year. Redeem your offer Free Basic models Limited messages and\nuploads Limited image generation Limited memory and context Limited access to custom GPTs\nGo 10x more messages with GPT-5 10x more file uploads 10x more image creation 2x more\nmemory and context Projects, tasks and custom GPTs Limits apply Your current plan Get\nChatGPT Go Extra access.\n----------------------------------------------------------------------\nResult 3\nsource: Gmail\nsubject: Use ChatGPT to make life easier\nfrom: ChatGPT <noreply@email.openai.com>\nto: jriswan207@gmail.com\ndate: Sat, 03 Jan 2026 05:04:15 +0000 (UTC)\nsummary: Generate, refine, and export in minutes Just tap a chat to start See everything ChatGPT can do for you. My friend shared a pic of their meal. Turn the photo into a recipe I can try I can&#39;t make a\ncontent:\nGenerate, refine, and export in minutes Just tap a chat to start See everything ChatGPT\ncan do for you. Help me decide what to buy Ask ChatGPT for more ways to get it all done\nStart chatting Start chatting 1455 3rd Street San Francisco, CA 94158 Unsubscribe Privacy\n\u00b7 Terms OpenAI \u00a9 2015-2025\n----------------------------------------------------------------------\nResult 4\nsource: Gmail\nsubject: Free ChatGPT Go for 12 months\nfrom: ChatGPT <noreply@email.openai.com>\nto: jriswan207@gmail.com\ndate: Wed, 10 Dec 2025 05:30:12 +0000 (UTC)\nsummary: Upgrade now for advanced access to AI tools ChatGPT Business Logo Try ChatGPT Go free for 12 months Unlock popular features like extended file uploads, image creation, and longer memory \u2014 all free for\ncontent:\nOpenAI Newsletter 96 Upgrade now for advanced access to AI tools Try ChatGPT Go free for\n12 months Unlock popular features like extended file uploads, image creation, and longer\nmemory \u2014 all free for one year. ChatGPT Go has everything you already use, plus more room\nto think, create, and get things done. Best, The ChatGPT Team Subject to eligibility .\n----------------------------------------------------------------------\nResult 5\nsource: Gmail\nsubject: Write faster with ChatGPT\nfrom: ChatGPT <noreply@email.openai.com>\nto: jriswan207@gmail.com\ndate: Fri, 26 Dec 2025 05:58:33 +0000 (UTC)\nsummary: Generate, refine, and export in minutes Just tap a chat to start Try these ideas for editing, drafting &amp; more My boss sent me a long list of tasks. Turn their email into a checklist My roommate is\ncontent:\nCheck the message for clarity Give me three subject lines for my email Ask ChatGPT for\nmore writing feedback Start chatting Start chatting 1455 3rd Street San Francisco, CA\n94158 Unsubscribe Privacy \u00b7 Terms OpenAI \u00a9 2015-2025\n----------------------------------------------------------------------\n======================================================================",
+          "timestamp": "10:10 AM"
+        },
+        {
+          "id": 1773117662037,
+          "role": "user",
+          "content": "latest news from chatgpt",
+          "timestamp": "10:11 AM"
+        },
+        {
+          "id": 1773117664408,
+          "role": "assistant",
+          "content": "======================================================================\nSOURCE: Gmail/Email\nQUERY: latest news from chatgpt\n======================================================================\n\nMatches: 2 found\n\nResult 1\nsource: Gmail\nsubject: [CodePen Spark] Custom Properties, Card Marquees, and Cool Carets\nfrom: CodePen <support@codepen.io>\nto: jriswan207@gmail.com\ndate: Mon, 03 Nov 2025 21:03:32 +0000\nsummary: View this issue on CodePen Custom Properties, Card Marquees, and Cool Carets This edition of The CodePen Spark is sponsored by Redis Cloud on AWS. Try it for free in AWS Marketplace. Today&#39;s\ncontent:\nthe inscribed angle makes the point.\" Chris\u2019 Corner A collection of web design and\ndevelopment news and thoughts from CodePen's own Chris Coyier. ChatGPT Atlas is the latest\ndrop.\n----------------------------------------------------------------------\nResult 2\nsource: Gmail\nsubject: Cool Curves, HTML Details, and a Gel Slider\nfrom: CodePen <support@codepen.io>\nto: jriswan207@gmail.com\ndate: Mon, 27 Oct 2025 20:00:58 +0000\nsummary: View this issue on CodePen Cool Curves, HTML Details, and a Gel Slider Today&#39;s CodePen community highlights include two Pens with cool curves: Chris Bolson&#39;s curved-edge scrollbars, and Mads\ncontent:\nChris\u2019 Corner A collection of web design and development news and thoughts from CodePen's\nown Chris Coyier. OpenAI released ChatGPT Atlas , the latest \u201cAI browser\u201d.\n----------------------------------------------------------------------\n======================================================================",
+          "timestamp": "10:11 AM"
+        },
+        {
+          "id": 1773118066257,
+          "role": "user",
+          "content": "latest news from chatgpt",
+          "timestamp": "10:17 AM"
+        }
+      ],
+      "createdAt": "2026-03-10T04:32:31.180Z",
+      "updatedAt": "2026-03-10T04:47:46.257Z"
+    }
+  ]
+}

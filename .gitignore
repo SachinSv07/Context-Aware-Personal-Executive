@@ -58,16 +58,10 @@ htmlcov/
 *.db
 *.sqlite
 
-# Node
-node_modules/
-frontend/node_modules/
-npm-debug.log*
-yarn-error.log*
-
-# OAuth credentials and secrets (never commit these)
-backend/data/oauth_credentials.json
-backend/data/oauth_app_config.json
-
 # User data (if storing actual personal data)
 sample_data/*.pdf
 !sample_data/README_PDF.txt
+
+# OAuth credentials (sensitive data)
+backend/data/oauth_app_config.json
+backend/data/oauth_credentials.json
