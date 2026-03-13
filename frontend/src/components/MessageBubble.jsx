@@ -1,7 +1,23 @@
 import ReactMarkdown from 'react-markdown';
 
-function MessageBubble({ role, content, timestamp }) {
+function MessageBubble({ role, content, timestamp, metadata }) {
   const isUser = role === 'user';
+
+  const sourceLabelMap = {
+    email: 'Gmail/Email',
+    calendar: 'Google Calendar',
+    drive: 'Google Drive',
+    pdf: 'PDF',
+    csv: 'CSV/Notes',
+  };
+
+  const selectedSourceLabel = metadata?.selected_source
+    ? sourceLabelMap[metadata.selected_source] || metadata.selected_source
+    : null;
+
+  const searchedSourceLabels = Array.isArray(metadata?.searched_sources)
+    ? metadata.searched_sources.map((source) => sourceLabelMap[source] || source)
+    : [];
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -12,6 +28,29 @@ function MessageBubble({ role, content, timestamp }) {
             : 'rounded-bl-md bg-[var(--bubble-ai)] text-slate-200'
         }`}
       >
+        {!isUser && metadata ? (
+          <div className="mb-3 rounded-lg border border-slate-700/80 bg-slate-900/60 px-3 py-2 text-xs text-slate-300">
+            {selectedSourceLabel ? (
+              <div className="mb-1">
+                <span className="font-semibold text-slate-200">Source:</span> {selectedSourceLabel}
+              </div>
+            ) : null}
+            {typeof metadata?.results_count === 'number' ? (
+              <div className="mb-1">
+                <span className="font-semibold text-slate-200">Matches:</span> {metadata.results_count}
+              </div>
+            ) : null}
+            {searchedSourceLabels.length > 0 ? (
+              <div className="mb-1">
+                <span className="font-semibold text-slate-200">Searched:</span> {searchedSourceLabels.join(' → ')}
+              </div>
+            ) : null}
+            {metadata?.reason ? (
+              <div className="text-slate-400">{metadata.reason}</div>
+            ) : null}
+          </div>
+        ) : null}
+
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm leading-6">{content}</p>
         ) : (

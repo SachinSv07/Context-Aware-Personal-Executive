@@ -214,12 +214,8 @@ def search_gmail(query: str, user_email: str | None = None) -> List[Dict[str, An
 
         messages = response.get("messages", [])
         if not messages and query.strip():
-            log_info(f"No Gmail matches for '{query}', falling back to recent inbox messages")
-            response = service.users().messages().list(
-                userId="me",
-                maxResults=max(MAX_SEARCH_RESULTS * 4, 20),
-            ).execute()
-            messages = response.get("messages", [])
+            log_info(f"No Gmail matches for '{query}'")
+            return []
 
         results: List[Dict[str, Any]] = []
 

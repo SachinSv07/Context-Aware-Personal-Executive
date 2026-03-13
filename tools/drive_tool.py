@@ -1,5 +1,6 @@
 """Google Drive search tool using the Google Drive API."""
 
+import json
 from pathlib import Path
 from typing import List, Dict, Any
 from io import BytesIO
@@ -42,6 +43,45 @@ def _load_drive_credentials() -> Credentials | None:
             token_path.write_text(creds.to_json(), encoding="utf-8")
         except Exception as exc:
             log_error("Failed to refresh Drive token", exc)
+            return None
+
+    return creds
+
+
+def _load_oauth_credentials_from_user(email: str) -> Credentials | None:
+    project_root = Path(__file__).resolve().parent.parent
+    oauth_file = project_root / "backend" / "data" / "oauth_credentials.json"
+    if not oauth_file.exists():
+        return None
+
+    try:
+        oauth_db = json.loads(oauth_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log_error("Failed to parse oauth_credentials.json for drive", exc)
+        return None
+
+    provider_data = oauth_db.get((email or "").lower(), {}).get("google")
+    if not provider_data:
+        return None
+
+    try:
+        creds = Credentials(
+            token=provider_data.get("token"),
+            refresh_token=provider_data.get("refresh_token"),
+            token_uri=provider_data.get("token_uri", "https://oauth2.googleapis.com/token"),
+            client_id=provider_data.get("client_id"),
+            client_secret=provider_data.get("client_secret"),
+            scopes=provider_data.get("scopes") or DRIVE_SCOPES,
+        )
+    except Exception as exc:
+        log_error("Failed to build user Drive OAuth credentials", exc)
+        return None
+
+    if creds and creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception as exc:
+            log_error("Failed to refresh Drive credentials", exc)
             return None
 
     return creds
@@ -149,7 +189,7 @@ def _extract_content_from_file(service, file_id: str, mime_type: str, file_name:
         return "(Error reading file)"
 
 
-def search_drive(query: str) -> List[Dict[str, Any]]:
+def search_drive(query: str, user_email: str | None = None) -> List[Dict[str, Any]]:
     """
     Search through Google Drive files via the Drive API.
 
@@ -164,9 +204,11 @@ def search_drive(query: str) -> List[Dict[str, Any]]:
     log_info(f"Searching Google Drive for: {query}")
 
     try:
-        creds = _load_drive_credentials()
+        creds = _load_oauth_credentials_from_user(user_email) if user_email else None
         if not creds:
-            log_error(f"Drive token not found or invalid: {DRIVE_TOKEN_PATH}")
+            creds = _load_drive_credentials()
+        if not creds:
+            log_info("No Drive OAuth credentials found for user")
             return []
 
         service = build("drive", "v3", credentials=creds)

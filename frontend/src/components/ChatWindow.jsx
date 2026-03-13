@@ -39,6 +39,7 @@ function ChatWindow({ messages, isLoading }) {
             key={message.id}
             role={message.role}
             content={message.content}
+            metadata={message.metadata}
             timestamp={message.timestamp}
           />
         ))}

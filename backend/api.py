@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from agent import process_query
+from agent import process_query_structured
 from backend.auth_manager import AuthManager
 
 try:
@@ -50,6 +50,29 @@ auth_manager = AuthManager()
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def update_google_services_connection(user_email, connected, gmail_address=None):
+    """Update Gmail, Calendar, and Drive connection status together."""
+    timestamp = datetime.now().isoformat() if connected else None
+
+    gmail_data = {
+        'connected': connected,
+        'email': gmail_address if connected else '',
+        'last_sync': timestamp
+    }
+    calendar_data = {
+        'connected': connected,
+        'last_sync': timestamp
+    }
+    drive_data = {
+        'connected': connected,
+        'last_sync': timestamp
+    }
+
+    auth_manager.update_data_source(user_email, 'gmail', gmail_data)
+    auth_manager.update_data_source(user_email, 'calendar', calendar_data)
+    auth_manager.update_data_source(user_email, 'drive', drive_data)
 
 
 def get_current_user():
@@ -115,20 +138,43 @@ def query():
     }
     """
     try:
-        data = request.get_json()
-        user_query = data.get('query', '').strip()
-        
+        data = request.get_json(silent=True) or {}
+        user_query = str(data.get('query', '')).strip()
+
         if not user_query:
             return jsonify({'error': 'Query is required'}), 400
-        
+
         # Call agent with user context so tools can use user-scoped OAuth data
         user_email = get_current_user()
-        response = process_query(user_query, user_email=user_email)
-        
-        return jsonify({'response': response})
-    
+        result = process_query_structured(user_query, user_email=user_email)
+
+        if not isinstance(result, dict):
+            result = {
+                'answer': str(result),
+                'selected_source': None,
+                'searched_sources': [],
+                'results_count': 0,
+                'routing_reason': 'Agent returned non-structured result.'
+            }
+
+        selected_source = result.get('selected_source')
+        searched_sources = result.get('searched_sources', [])
+
+        return jsonify({
+            'response': result.get('answer', ''),
+            'routing': {
+                'selected_source': selected_source,
+                'searched_sources': searched_sources,
+                'results_count': result.get('results_count', 0),
+                'reason': result.get('routing_reason', '')
+            }
+        })
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_message = str(e)
+        if 'authorization token' in error_message.lower() or 'invalid token' in error_message.lower():
+            return jsonify({'error': error_message}), 401
+        return jsonify({'error': error_message}), 500
 
 
 # ==================== Authentication Endpoints ====================
@@ -638,6 +684,9 @@ def google_oauth_callback():
         # Store credentials in auth_manager
         user_email = state  # We passed user_email as state
         auth_manager.store_oauth_credentials(user_email, 'google', creds_dict)
+
+        gmail_email = creds_dict.get('account', '').strip() if isinstance(creds_dict, dict) else ''
+        update_google_services_connection(user_email, True, gmail_email)
         
         # Redirect to frontend success page
         return redirect('http://localhost:3000/dashboard?oauth=success')
@@ -667,11 +716,22 @@ def google_oauth_status():
         
         # Check if user has connected their account
         credentials = auth_manager.get_oauth_credentials(user_email, 'google')
+        sources = auth_manager.get_data_sources(user_email)
+        google_services_connected = bool(credentials)
+
+        if google_services_connected:
+            gmail_email = credentials.get('account', '').strip() if isinstance(credentials, dict) else ''
+            update_google_services_connection(user_email, True, gmail_email)
         
         return jsonify({
-            'connected': bool(credentials),
+            'connected': google_services_connected,
             'oauth_configured': oauth_configured,
-            'provider': 'google'
+            'provider': 'google',
+            'services': {
+                'gmail': bool(sources.get('gmail', {}).get('connected')) or google_services_connected,
+                'calendar': bool(sources.get('calendar', {}).get('connected')) or google_services_connected,
+                'drive': bool(sources.get('drive', {}).get('connected')) or google_services_connected
+            }
         })
     
     except Exception as e:
@@ -684,6 +744,7 @@ def google_oauth_disconnect():
     try:
         user_email = get_current_user()
         deleted = auth_manager.delete_oauth_credentials(user_email, 'google')
+        update_google_services_connection(user_email, False)
 
         return jsonify({
             'success': True,

@@ -26,5 +26,104 @@
       "connected": false,
       "last_sync": null
     }
+  },
+  "riswan@gmail.com": {
+    "gmail": {
+      "connected": true,
+      "email": "",
+      "last_sync": "2026-03-13T21:43:18.952701"
+    },
+    "drive": {
+      "connected": true,
+      "last_sync": "2026-03-13T21:43:18.952701"
+    },
+    "calendar": {
+      "connected": true,
+      "last_sync": "2026-03-13T21:43:18.952701"
+    }
+  },
+  "uploadtest_1773416779@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  },
+  "uploadtest_1773416898@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  },
+  "routingtest_1773418345@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  },
+  "calfix_1773418523@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  },
+  "concisetest_1773418862@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
+  },
+  "err500_1773419269@example.com": {
+    "gmail": {
+      "connected": false,
+      "last_sync": null
+    },
+    "drive": {
+      "connected": false,
+      "last_sync": null
+    },
+    "calendar": {
+      "connected": false,
+      "last_sync": null
+    }
   }
 }

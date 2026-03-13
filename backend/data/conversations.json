@@ -83,6 +83,174 @@
       ],
       "createdAt": "2026-03-10T04:32:31.180Z",
       "updatedAt": "2026-03-10T04:47:46.257Z"
+    },
+    {
+      "id": "2",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773136020209,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "03:17 PM"
+        }
+      ],
+      "createdAt": "2026-03-10T09:46:45.604Z",
+      "updatedAt": "2026-03-10T09:47:00.210Z"
+    },
+    {
+      "id": "3",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773136090803,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "03:18 PM"
+        }
+      ],
+      "createdAt": "2026-03-10T09:48:04.014Z",
+      "updatedAt": "2026-03-10T09:48:10.803Z"
+    }
+  ],
+  "riswan@gmail.com": [
+    {
+      "id": "1",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773417285041,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:24 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T15:54:36.826Z",
+      "updatedAt": "2026-03-13T15:54:45.042Z"
+    },
+    {
+      "id": "2",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773418411073,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:43 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:13:21.035Z",
+      "updatedAt": "2026-03-13T16:13:31.074Z"
+    },
+    {
+      "id": "3",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773418597270,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:46 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:16:30.751Z",
+      "updatedAt": "2026-03-13T16:16:37.270Z"
+    },
+    {
+      "id": "4",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773418642316,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:47 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:17:14.282Z",
+      "updatedAt": "2026-03-13T16:17:22.317Z"
+    },
+    {
+      "id": "5",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773419060045,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:54 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:21:57.784Z",
+      "updatedAt": "2026-03-13T16:24:20.046Z"
+    },
+    {
+      "id": "6",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773419225821,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "09:57 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:26:57.646Z",
+      "updatedAt": "2026-03-13T16:27:05.821Z"
+    },
+    {
+      "id": "7",
+      "title": "when is arun birthday?",
+      "messages": [
+        {
+          "id": 1773419507384,
+          "role": "user",
+          "content": "when is arun birthday?",
+          "timestamp": "10:01 PM"
+        },
+        {
+          "id": 1773419516323,
+          "role": "assistant",
+          "content": "Arun's birthday is on March 13.",
+          "metadata": {
+            "reason": "The query indicates a personal date/event intent, so Google Calendar was prioritized before email and validated across Google Calendar.",
+            "results_count": 1,
+            "searched_sources": [
+              "calendar"
+            ],
+            "selected_source": "calendar"
+          },
+          "timestamp": "10:01 PM"
+        },
+        {
+          "id": 1773419587244,
+          "role": "user",
+          "content": "when is my birthday?",
+          "timestamp": "10:03 PM"
+        },
+        {
+          "id": 1773419620363,
+          "role": "assistant",
+          "content": "Your birthday is on March 12.",
+          "metadata": {
+            "reason": "The query indicates a personal date/event intent, so Google Calendar was prioritized before email and validated across Google Calendar.",
+            "results_count": 1,
+            "searched_sources": [
+              "calendar"
+            ],
+            "selected_source": "calendar"
+          },
+          "timestamp": "10:03 PM"
+        },
+        {
+          "id": 1773419654655,
+          "role": "user",
+          "content": "give me latest mail",
+          "timestamp": "10:04 PM"
+        }
+      ],
+      "createdAt": "2026-03-13T16:30:23.794Z",
+      "updatedAt": "2026-03-13T16:34:14.655Z"
     }
   ]
 }

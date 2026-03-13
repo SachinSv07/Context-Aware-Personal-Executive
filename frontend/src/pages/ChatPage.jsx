@@ -68,6 +68,7 @@ function ChatPage({ onLogout }) {
           id: Date.now() + 1,
           role: 'assistant',
           content: data.response || 'No response from server',
+          metadata: data.routing || null,
           timestamp: createTimestamp(),
         };
         addMessage(activeChat.id, aiMessage);

@@ -13,6 +13,7 @@ import importlib
 import json
 import logging as _logging
 import os
+import re
 from urllib import error as url_error
 from urllib import request as url_request
 from typing import Any, Literal
@@ -26,6 +27,14 @@ except ImportError:
 _synth_log = _logging.getLogger(__name__)
 
 ToolName = Literal["email", "pdf", "csv", "drive", "calendar"]
+
+TOOL_SOURCE_LABELS: dict[ToolName, str] = {
+    "email": "Gmail/Email",
+    "drive": "Google Drive",
+    "calendar": "Google Calendar",
+    "pdf": "PDF",
+    "csv": "CSV/Notes",
+}
 
 
 def _load_local_env() -> None:
@@ -80,6 +89,8 @@ def _normalize_tool(raw_output: str) -> ToolName:
 def _fallback_tool_choice(query: str) -> ToolName:
     """Simple local fallback when API is missing/unavailable."""
     q = query.lower()
+    if any(k in q for k in ["birthday", "birth", "dob", "date of birth", "anniversary"]):
+        return "calendar"
     if any(k in q for k in ["email", "mail", "inbox", "sender", "subject"]):
         return "email"
     if any(k in q for k in ["drive", "google drive", "document", "docs", "spreadsheet", "sheet", "slides", "file"]):
@@ -91,6 +102,60 @@ def _fallback_tool_choice(query: str) -> ToolName:
     if any(k in q for k in ["csv", "table", "sheet", "row", "column", "note", "notes"]):
         return "csv"
     return "email"
+
+
+def _tool_intent_scores(query: str) -> dict[ToolName, float]:
+    q = (query or "").strip().lower()
+    scores: dict[ToolName, float] = {
+        "email": 0.1,
+        "pdf": 0.1,
+        "csv": 0.1,
+        "drive": 0.1,
+        "calendar": 0.1,
+    }
+
+    keyword_weights: dict[ToolName, list[str]] = {
+        "email": ["email", "mail", "inbox", "sender", "subject", "thread", "message"],
+        "calendar": ["calendar", "meeting", "event", "schedule", "appointment", "birthday", "anniversary", "dob", "date of birth"],
+        "drive": ["drive", "folder", "google drive", "docs", "sheets", "slides", "shared file"],
+        "pdf": ["pdf", "report", "paper", "page", "document"],
+        "csv": ["csv", "sheet", "table", "row", "column", "notes", "records", "contact list"],
+    }
+
+    for tool, keywords in keyword_weights.items():
+        for keyword in keywords:
+            if keyword in q:
+                scores[tool] += 1.0
+
+    if "when is" in q and any(token in q for token in ["birthday", "dob", "birth", "anniversary"]):
+        scores["calendar"] += 1.5
+        scores["csv"] += 1.0
+        scores["email"] -= 0.4
+
+    return scores
+
+
+def rank_tools(query: str) -> list[ToolName]:
+    """Return tools ordered by likely relevance to the user prompt."""
+    scores = _tool_intent_scores(query)
+    llm_choice = choose_tool(query)
+    scores[llm_choice] += 0.75
+
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    return [tool for tool, _ in ranked]
+
+
+def _build_routing_reason(query: str, selected_tool: ToolName, searched_tools: list[ToolName]) -> str:
+    q = (query or "").lower()
+    if any(token in q for token in ["birthday", "dob", "date of birth", "anniversary"]):
+        return (
+            f"The query indicates a personal date/event intent, so {TOOL_SOURCE_LABELS[selected_tool]} was prioritized "
+            f"before email and validated across {', '.join(TOOL_SOURCE_LABELS[t] for t in searched_tools)}."
+        )
+    return (
+        f"Intent-based routing selected {TOOL_SOURCE_LABELS[selected_tool]} as the best match for this question "
+        f"after checking {', '.join(TOOL_SOURCE_LABELS[t] for t in searched_tools)}."
+    )
 
 
 def choose_tool(query: str) -> ToolName:
@@ -217,12 +282,12 @@ def _run_tool(tool: ToolName, query: str, user_email: str | None = None) -> Any:
     if tool == "drive":
         from tools.drive_tool import search_drive
 
-        return search_drive(query)
+        return search_drive(query, user_email=user_email)
 
     if tool == "calendar":
         from tools.calendar_tool import search_calendar
 
-        return search_calendar(query)
+        return search_calendar(query, user_email=user_email)
 
     from tools.csv_tool import search_csv
 
@@ -230,7 +295,93 @@ def _run_tool(tool: ToolName, query: str, user_email: str | None = None) -> Any:
 
 
 def _is_non_empty_result(result: Any) -> bool:
-    return isinstance(result, list) and len(result) > 0
+    if not isinstance(result, list) or len(result) == 0:
+        return False
+
+    scored_items = [
+        item.get("relevance_score")
+        for item in result
+        if isinstance(item, dict) and isinstance(item.get("relevance_score"), (int, float))
+    ]
+
+    if scored_items:
+        return any(score >= 0.2 for score in scored_items)
+
+    return True
+
+
+def _extract_person_for_birthday_query(query: str) -> str:
+    q = (query or "").strip().lower()
+    match = re.search(r"when\s+is\s+(.+?)\s+(?:birthday|dob|date\s+of\s+birth)", q)
+    if not match:
+        return ""
+    name = match.group(1).strip()
+    return re.sub(r"\s+", " ", name)
+
+
+def _filter_results_for_query(tool: ToolName, query: str, result: Any) -> Any:
+    if not isinstance(result, list) or not result:
+        return result
+
+    q = (query or "").lower()
+    if tool == "calendar" and any(token in q for token in ["birthday", "dob", "date of birth"]):
+        person = _extract_person_for_birthday_query(query)
+        if person:
+            filtered = []
+            for item in result:
+                if not isinstance(item, dict):
+                    continue
+                haystack = " ".join([
+                    str(item.get("summary", "")),
+                    str(item.get("description", "")),
+                ]).lower()
+                if person in haystack:
+                    filtered.append(item)
+            if filtered:
+                return filtered
+
+    return result
+
+
+def _wants_brief_answer(query: str) -> bool:
+    q = (query or "").strip().lower()
+    asks_details = any(
+        token in q
+        for token in ["details", "detail", "list", "show all", "full", "explain", "why", "summarize"]
+    )
+    direct_question = any(
+        q.startswith(prefix)
+        for prefix in ["when", "what", "who", "where", "which", "how many", "is ", "does ", "did "]
+    )
+    return direct_question and not asks_details
+
+
+def _format_fallback_answer(tool: ToolName, query: str, result: Any) -> str:
+    if not isinstance(result, list) or not result:
+        return "I couldn't find relevant information for that question."
+
+    q = (query or "").lower()
+    if tool == "calendar" and any(token in q for token in ["birthday", "dob", "date of birth", "when is"]):
+        person = _extract_person_for_birthday_query(query)
+        top = result[0] if isinstance(result[0], dict) else {}
+        summary = str(top.get("summary", "")).strip()
+        start = str(top.get("start", "")).strip()
+        date_only = start.split("T")[0] if start else start
+        if person and date_only:
+            return f"{person.title()}'s birthday is on {date_only}."
+        if summary and date_only:
+            return f"{summary} is on {date_only}."
+
+    first = result[0]
+    if isinstance(first, dict):
+        if first.get("summary"):
+            return str(first.get("summary"))
+        if first.get("subject"):
+            return str(first.get("subject"))
+        if first.get("name"):
+            return str(first.get("name"))
+
+    return _shorten(first, 220)
 
 
 def _shorten(text: Any, limit: int = 140) -> str:
@@ -486,44 +637,32 @@ def _synthesize_response(tool: ToolName, query: str, result: Any) -> str:
     """
     gemini_api_key = os.getenv("GEMINI_API_KEY")
     if not gemini_api_key:
-        _synth_log.warning("[SYNTHESIZE] GEMINI_API_KEY not found — using structured fallback")
-        return _format_structured_result(tool, query, result)
-
-    source_map = {
-        "email": "Gmail/Email",
-        "drive": "Google Drive",
-        "calendar": "Google Calendar",
-        "pdf": "PDF",
-        "csv": "CSV/Notes",
-    }
+        _synth_log.warning("[SYNTHESIZE] GEMINI_API_KEY not found — using concise fallback")
+        return _format_fallback_answer(tool, query, result)
 
     raw_data = _truncate_results_for_prompt(result)
-    source_label = source_map.get(tool, tool)
+    source_label = TOOL_SOURCE_LABELS.get(tool, tool)
     num_results = len(result) if isinstance(result, list) else 1
+    brief_answer = _wants_brief_answer(query)
+
+    response_style = (
+        "Answer in exactly 1-2 sentences with only the direct fact requested. "
+        "Do not include bullets, headings, lists, source breakdown, or extra commentary."
+        if brief_answer
+        else "Answer clearly in short markdown with only relevant details."
+    )
 
     prompt = (
-        "You are a helpful personal executive assistant. "
-        "Your response will be rendered as Markdown in a chat UI — use proper Markdown formatting.\n\n"
+        "You are a helpful personal executive assistant.\n\n"
         f'The user asked: "{query}"\n\n'
-        f"I searched their {source_label} and found {num_results} result(s):\n\n"
+        f"Selected source: {source_label}. Matching result count: {num_results}.\n\n"
         f"{raw_data}\n\n"
-        "Respond in EXACTLY this structure — no deviations:\n\n"
-        "Opening line: one plain sentence like 'I found X [source] results about [topic].'\n\n"
-        "For EACH result, output:\n"
-        "### <subject or title here>\n"
-        "- **From:** <sender name and email>\n"
-        "- **Date:** <date and time>\n"
-        "- **Summary:** <2-3 sentences covering the key content, decisions, or context>\n"
-        "- **Action / Deadline:** <next steps or deadlines — omit this line entirely if none>\n\n"
-        "After all results, output a divider and takeaway:\n"
-        "---\n"
-        "**Takeaway:** <one sentence overall insight or recommended next action>\n\n"
-        "STRICT RULES:\n"
-        "- Never output raw JSON, code blocks, or ASCII art\n"
-        "- Never skip the ### heading for each result\n"
-        "- Use **bold** for all field labels (From, Date, Summary, etc.)\n"
-        "- Keep tone warm and professional\n"
-        "- If zero results found, write a polite apology and suggest a rephrased search\n"
+        f"{response_style}\n\n"
+        "Hard rules:\n"
+        "- Use only information supported by the provided results\n"
+        "- Prefer the single best match to the user question\n"
+        "- Ignore near matches that refer to other people/items\n"
+        "- If results are insufficient, say that briefly and ask one short clarifying question\n"
     )
 
     _synth_log.info("[SYNTHESIZE] Calling Gemini to synthesize %s result(s) for query: %s",
@@ -546,7 +685,7 @@ def _synthesize_response(tool: ToolName, query: str, result: Any) -> str:
         except Exception as exc:
             _synth_log.error("[SYNTHESIZE] Gemini SDK call failed (%s: %s) — using structured fallback",
                              type(exc).__name__, exc)
-        return _format_structured_result(tool, query, result)
+        return _format_fallback_answer(tool, query, result)
 
     # urllib fallback (only if SDK not installed)
     try:
@@ -581,40 +720,55 @@ def _synthesize_response(tool: ToolName, query: str, result: Any) -> str:
         _synth_log.error("[SYNTHESIZE] Gemini urllib call failed (%s: %s) — using structured fallback",
                          type(exc).__name__, exc)
 
-    return _format_structured_result(tool, query, result)
+    return _format_fallback_answer(tool, query, result)
+
+
+def process_query_structured(query: str, user_email: str | None = None) -> dict[str, Any]:
+    """Main orchestrator returning both answer text and routing metadata."""
+    if not query or not query.strip():
+        return {
+            "answer": "No relevant information found.",
+            "selected_source": None,
+            "searched_sources": [],
+            "results_count": 0,
+            "routing_reason": "Query was empty.",
+        }
+
+    candidate_tools = rank_tools(query)
+    searched_sources: list[ToolName] = []
+
+    try:
+        for candidate in candidate_tools:
+            searched_sources.append(candidate)
+            candidate_result = _run_tool(candidate, query, user_email=user_email)
+            candidate_result = _filter_results_for_query(candidate, query, candidate_result)
+            if _is_non_empty_result(candidate_result):
+                answer = _synthesize_response(candidate, query, candidate_result)
+                return {
+                    "answer": answer,
+                    "selected_source": candidate,
+                    "searched_sources": searched_sources,
+                    "results_count": len(candidate_result) if isinstance(candidate_result, list) else 0,
+                    "routing_reason": _build_routing_reason(query, candidate, searched_sources),
+                }
+
+        return {
+            "answer": "I couldn't find any relevant information for your query. Please try rephrasing or check that your data sources are connected.",
+            "selected_source": None,
+            "searched_sources": searched_sources,
+            "results_count": 0,
+            "routing_reason": "No relevant matches were found in the searched data sources.",
+        }
+    except Exception:
+        return {
+            "answer": "No relevant information found.",
+            "selected_source": None,
+            "searched_sources": searched_sources,
+            "results_count": 0,
+            "routing_reason": "An internal error occurred during routing or search.",
+        }
 
 
 def process_query(query: str, user_email: str | None = None) -> str:
-    """Main orchestrator entry point.
-
-    Usage:
-        from agent.agent import process_query
-        response = process_query(user_query)
-    """
-    if not query or not query.strip():
-        return "No relevant information found."
-
-    tool = choose_tool(query)
-
-    try:
-        result = _run_tool(tool, query, user_email=user_email)
-        if _is_non_empty_result(result):
-            return _synthesize_response(tool, query, result)
-
-        fallback_order: list[ToolName] = ["email", "pdf", "csv", "drive", "calendar"]
-        for candidate in fallback_order:
-            if candidate == tool:
-                continue
-            candidate_result = _run_tool(candidate, query, user_email=user_email)
-            if _is_non_empty_result(candidate_result):
-                return _synthesize_response(candidate, query, candidate_result)
-
-        # Final safety net: if nothing matched, try returning recent Gmail context
-        # so chat still provides a useful response instead of empty results.
-        recent_email_result = _run_tool("email", "", user_email=user_email)
-        if _is_non_empty_result(recent_email_result):
-            return _synthesize_response("email", query, recent_email_result)
-
-        return "I couldn't find any relevant information for your query. Please try rephrasing or check that your data sources are connected."
-    except Exception:
-        return "No relevant information found."
+    """Backward-compatible string response entry point."""
+    return process_query_structured(query, user_email=user_email).get("answer", "No relevant information found.")

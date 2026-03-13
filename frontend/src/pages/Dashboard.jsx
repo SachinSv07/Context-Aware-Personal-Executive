@@ -121,44 +121,25 @@ function OAuthSetupModal({ isOpen, onClose, onSave }) {
   );
 }
 
-// Card for text input sources (Email, Notes)
-function TextInputCard({ title, description, value, onChange, buttonText = 'Save', onAction, helpText }) {
-  return (
-    <div className="rounded-2xl border border-slate-700 bg-[var(--surface-1)] p-5 shadow-lg transition hover:border-slate-500">
-      <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
-      <p className="mt-1 text-sm text-slate-400">{description}</p>
-      {helpText && (
-        <div className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-500">
-          💡 {helpText}
-        </div>
-      )}
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none"
-        placeholder={`Add ${title.toLowerCase()} (optional)`}
-      />
-      <button
-        type="button"
-        onClick={onAction}
-        className="mt-4 rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110"
-      >
-        {buttonText}
-      </button>
-    </div>
-  );
-}
-
 // Card for file upload sources (PDF, Google Drive)
 function FileUploadCard({ title, description, onUpload }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      onUpload(file);
     }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || isUploading) {
+      return;
+    }
+    setIsUploading(true);
+    await onUpload(selectedFile);
+    setIsUploading(false);
   };
 
   return (
@@ -195,20 +176,27 @@ function FileUploadCard({ title, description, onUpload }) {
 
       <button
         type="button"
-        disabled={!selectedFile}
+        onClick={handleUpload}
+        disabled={!selectedFile || isUploading}
         className="mt-4 w-full rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Upload & Save
+        {isUploading ? 'Uploading...' : 'Upload & Save'}
       </button>
     </div>
   );
 }
 
 // Card for Google Drive picker
-function GoogleDriveCard({ onFilesSelected }) {
+function GoogleDriveCard({ onFilesSelected, isConnected, onConnect, isConnecting }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const openDrivePicker = () => {
+    if (!isConnected) {
+      onConnect();
+      return;
+    }
+
     // TODO: Integrate Google Drive Picker API
     // This will open Google's file picker dialog for selecting files from Drive
     alert('Google Drive Picker will open here.\n\nImplementation requires:\n1. Google Cloud Project setup\n2. Drive API enabled\n3. OAuth 2.0 credentials\n4. Drive Picker API script loaded\n\nUser will be able to browse and select files from their Google Drive.');
@@ -218,7 +206,15 @@ function GoogleDriveCard({ onFilesSelected }) {
       { id: '1abc', name: 'Project_Plan.pdf', mimeType: 'application/pdf' }
     ];
     setSelectedFiles(mockFiles);
-    onFilesSelected(mockFiles);
+  };
+
+  const handleSaveSelected = async () => {
+    if (selectedFiles.length === 0 || isSaving) {
+      return;
+    }
+    setIsSaving(true);
+    await onFilesSelected(selectedFiles);
+    setIsSaving(false);
   };
 
   return (
@@ -228,11 +224,21 @@ function GoogleDriveCard({ onFilesSelected }) {
         Select files from your Google Drive for richer context.
       </p>
 
+      <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 py-3">
+        <span className="text-sm text-slate-400">
+          {isConnected ? 'Connected' : 'Not connected'}
+        </span>
+        {isConnected && (
+          <span className="h-2 w-2 rounded-full bg-teal-400" />
+        )}
+      </div>
+
       <div className="mt-4">
         <button
           type="button"
+          disabled={isConnecting}
           onClick={openDrivePicker}
-          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 px-4 py-6 transition hover:border-teal-400"
+          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 px-4 py-6 transition hover:border-teal-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <svg
             className="h-8 w-8 text-slate-500"
@@ -242,7 +248,7 @@ function GoogleDriveCard({ onFilesSelected }) {
             <path d="M7.71 3.5L1.15 15l3.58 6.5L11.29 9.5 7.71 3.5M9.73 15L6.15 21.5h14.5L24.23 15H9.73M22.28 14l-3.58-6.5-7.43 12.5 3.58 6.5L22.28 14z" />
           </svg>
           <span className="mt-2 text-sm font-medium text-teal-400">
-            Select from Google Drive
+            {isConnected ? 'Select from Google Drive' : (isConnecting ? 'Connecting...' : 'Connect Google to Use Drive')}
           </span>
         </button>
       </div>
@@ -265,10 +271,11 @@ function GoogleDriveCard({ onFilesSelected }) {
 
       <button
         type="button"
-        disabled={selectedFiles.length === 0}
+        onClick={handleSaveSelected}
+        disabled={selectedFiles.length === 0 || !isConnected || isSaving}
         className="mt-4 w-full rounded-xl bg-teal-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Save Selected Files
+        {isSaving ? 'Saving...' : 'Save Selected Files'}
       </button>
     </div>
   );
@@ -306,8 +313,6 @@ function ConnectCard({ title, description, onConnect, isConnected }) {
 }
 
 function Dashboard({ onLogout }) {
-  const [notes, setNotes] = useState('');
-  const [calendarConnected, setCalendarConnected] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -419,25 +424,78 @@ function Dashboard({ onLogout }) {
     }
   };
 
-  const handleNotesSave = () => {
-    // TODO: Save notes to backend
-    console.log('Saving notes:', notes);
+  const handlePdfUpload = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = localStorage.getItem('token');
+
+    setStatusMessage('Uploading PDF...');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/files/upload', {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` })
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setStatusMessage(`Error: ${data.error || 'Failed to upload PDF'}`);
+        return;
+      }
+
+      setStatusMessage(`Success: PDF uploaded (${data.file?.name || file.name})`);
+    } catch (error) {
+      console.error('PDF upload error:', error);
+      setStatusMessage('Error: Failed to upload PDF. Make sure backend is running.');
+    }
   };
 
-  const handlePdfUpload = (file) => {
-    // TODO: Upload PDF to backend
-    console.log('Uploading PDF:', file);
-  };
+  const handleDriveFilesSelected = async (files) => {
+    if (!files?.length) {
+      return;
+    }
 
-  const handleDriveFilesSelected = (files) => {
-    // TODO: Send Google Drive file references to backend
-    console.log('Selected files from Google Drive:', files);
+    setStatusMessage('Saving Google Drive file selection...');
+
+    try {
+      const responses = await Promise.all(
+        files.map((file) =>
+          fetch('http://localhost:5000/api/data-sources/drive/connect', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ file_id: file.id, file_name: file.name })
+          })
+        )
+      );
+
+      const failedResponse = responses.find((response) => !response.ok);
+      if (failedResponse) {
+        const failedData = await failedResponse.json();
+        setStatusMessage(`Error: ${failedData.error || 'Failed to save selected Drive files'}`);
+        return;
+      }
+
+      setStatusMessage('Success: Google Drive files saved');
+    } catch (error) {
+      console.error('Drive file save error:', error);
+      setStatusMessage('Error: Failed to save selected Drive files.');
+    }
   };
 
   const handleCalendarConnect = () => {
-    // TODO: Integrate with Google Calendar API
-    setCalendarConnected(!calendarConnected);
-    console.log('Calendar connection toggled');
+    if (gmailLoading) {
+      return;
+    }
+    if (gmailConnected) {
+      handleGmailDisconnect();
+      return;
+    }
+    handleGmailConnect();
   };
 
   const saveOAuthCredentials = async ({ clientId, clientSecret }) => {
@@ -534,7 +592,7 @@ function Dashboard({ onLogout }) {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-slate-100">Gmail Account</h3>
-                <p className="mt-1 text-sm text-slate-400">Connect your Gmail inbox for email context ingestion.</p>
+                <p className="mt-1 text-sm text-slate-400">Connect once to enable Gmail, Google Drive, and Google Calendar.</p>
               </div>
               {gmailConnected && (
                 <span className="flex items-center gap-2 text-xs text-teal-400">
@@ -544,7 +602,7 @@ function Dashboard({ onLogout }) {
               )}
             </div>
             <div className="mt-2 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-500">
-              💡 User authentication via Google OAuth 2.0. Click 'Connect Gmail' to authorize access to your inbox securely.
+              💡 Google OAuth 2.0 connection is shared across Gmail, Drive, and Calendar.
             </div>
             <button
               type="button"
@@ -556,7 +614,7 @@ function Dashboard({ onLogout }) {
                   : 'bg-teal-400 text-slate-900 hover:brightness-110'
               }`}
             >
-              {gmailLoading ? (gmailConnected ? 'Disconnecting...' : 'Connecting...') : (gmailConnected ? 'Disconnect Gmail' : 'Connect Gmail')}
+              {gmailLoading ? (gmailConnected ? 'Disconnecting...' : 'Connecting...') : (gmailConnected ? 'Disconnect Google' : 'Connect Google')}
             </button>
           </div>
 
@@ -566,22 +624,18 @@ function Dashboard({ onLogout }) {
             onUpload={handlePdfUpload}
           />
 
-          <GoogleDriveCard onFilesSelected={handleDriveFilesSelected} />
+          <GoogleDriveCard
+            onFilesSelected={handleDriveFilesSelected}
+            isConnected={gmailConnected}
+            onConnect={handleGmailConnect}
+            isConnecting={gmailLoading}
+          />
 
           <ConnectCard
             title="Google Calendar"
             description="Sync your calendar events for scheduling and time management."
             onConnect={handleCalendarConnect}
-            isConnected={calendarConnected}
-          />
-
-          <TextInputCard
-            title="Notes Text"
-            description="Add raw notes to help your assistant understand your priorities."
-            value={notes}
-            onChange={setNotes}
-            buttonText="Save Notes"
-            onAction={handleNotesSave}
+            isConnected={gmailConnected}
           />
         </div>
       </div>
